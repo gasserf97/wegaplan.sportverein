@@ -9,7 +9,9 @@ services:
     plan: starter
     repo: https://github.com/ASCLAJEN/sportverein.lajen.git
     branch: main
-    buildCommand: npm ci && npx prisma generate && npx prisma migrate deploy && npm run build
+    # Build hat kein privates Netz: die interne DB-URL (dpg-…-a) ist dort nicht erreichbar.
+    buildCommand: npm ci && npx prisma generate && npm run build
+    preDeployCommand: npx prisma migrate deploy
     startCommand: npm start
     healthCheckPath: /
     disk:
