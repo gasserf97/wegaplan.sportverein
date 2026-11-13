@@ -1,5 +1,5 @@
 # Blueprint für Render (Frankfurt).
-# Deploy: https://dashboard.render.com → New → Blueprint → ASCLAJEN/sportverein.lajen
+# https://dashboard.render.com/blueprint/exs-dbrpv3tbedkc738frod0
 
 services:
   - type: web
@@ -7,7 +7,7 @@ services:
     runtime: node
     region: frankfurt
     plan: starter
-    repo: https://github.com/ASCLAJEN/sportverein.lajen.git
+    repo: https://github.com/gasserf97/wegaplan.sportverein.git
     branch: main
     # Build hat kein privates Netz: die interne DB-URL (dpg-…-a) ist dort nicht erreichbar.
     buildCommand: npm ci && npx prisma generate && npm run build
@@ -67,7 +67,7 @@ services:
     runtime: node
     region: frankfurt
     plan: starter
-    repo: https://github.com/ASCLAJEN/sportverein.lajen.git
+    repo: https://github.com/gasserf97/wegaplan.sportverein.git
     branch: main
     schedule: "15 * * * *"
     buildCommand: "true"
@@ -87,7 +87,7 @@ services:
     runtime: node
     region: frankfurt
     plan: starter
-    repo: https://github.com/ASCLAJEN/sportverein.lajen.git
+    repo: https://github.com/gasserf97/wegaplan.sportverein.git
     branch: main
     schedule: "0 6 * * 1,4"
     buildCommand: "true"
