@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN "failedLoginCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "User" ADD COLUMN "loginLockedUntil" TIMESTAMP(3);

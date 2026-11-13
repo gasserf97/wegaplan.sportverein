@@ -1,0 +1,1 @@
+ALTER TABLE "Course" ALTER COLUMN "location" SET DEFAULT '';

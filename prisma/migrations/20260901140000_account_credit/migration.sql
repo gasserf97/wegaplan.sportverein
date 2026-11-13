@@ -1,0 +1,4 @@
+ALTER TABLE "User" ADD COLUMN "creditBalanceCents" INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE "Enrollment" ADD COLUMN "paidCents" INTEGER;
+ALTER TABLE "Enrollment" ADD COLUMN "creditAppliedCents" INTEGER NOT NULL DEFAULT 0;

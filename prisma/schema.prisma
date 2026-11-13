@@ -1,0 +1,660 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum EnrollmentStatus {
+  PENDING
+  PAID
+  CANCELLED
+  WAITLISTED
+}
+
+enum PaymentMethod {
+  STRIPE
+  BANK_TRANSFER
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum CreditTransactionKind {
+  REFUND
+  PAYMENT
+}
+
+enum PendingRefundStatus {
+  PENDING
+  CONFIRMED
+}
+
+enum PendingRefundKind {
+  COURSE
+  DEVICE
+  SUBSCRIPTION
+}
+
+model User {
+  id                    String             @id @default(cuid())
+  username              String             @unique
+  name                  String
+  email                 String             @unique
+  emailVerifiedAt       DateTime?
+  emailVerifyToken      String?            @unique
+  emailVerifyExpiresAt  DateTime?
+  phone                 String
+  taxId                 String
+  /// Straße und Hausnummer
+  street                String             @default("")
+  /// Postleitzahl
+  postalCode            String             @default("")
+  /// Wohnort
+  city                  String             @default("")
+  birthDate             DateTime
+  passwordHash          String
+  /// False = Familienmitglied ohne eigenen Login (nur über Familienkonto buchbar).
+  canLogin              Boolean            @default(true)
+  role                  Role               @default(USER)
+  /// Darf Fahrzeuge/Busse im Fuhrpark reservieren (Admin vergibt das Recht).
+  canBookDevices        Boolean            @default(false)
+  creditBalanceCents    Int                @default(0)
+  lastLoginAt           DateTime? // letzte App-Aktivität (auch „angemeldet bleiben“)
+  /// Zuletzt geöffneter Zugang: BROWSER oder PWA.
+  lastClient            String?
+  /// Fehlversuche seit der letzten erfolgreichen Anmeldung oder Sperre.
+  failedLoginCount      Int                @default(0)
+  /// Gesetzt, solange die Anmeldung nach zu vielen Fehlversuchen gesperrt ist.
+  loginLockedUntil      DateTime?
+  /// Tennis-Buchungen als Kalender-Abo (Google / iPhone), nur auf Wunsch.
+  calendarSyncEnabled   Boolean            @default(false)
+  /// Geheimnis in der Abo-URL. Bleibt beim Ausschalten erhalten.
+  calendarFeedToken     String?            @unique
+  /// Eigene bestätigte Tennisplatz-Reservierungen im Kalender-Abo.
+  calendarSyncTennis    Boolean            @default(true)
+  /// Eigene gebuchte Kurse im Kalender-Abo.
+  calendarSyncCourses   Boolean            @default(true)
+  /// Kurse von angelegten Kindern (unter 18) im Kalender-Abo.
+  calendarSyncChildCourses Boolean         @default(true)
+  /// Tennis-Kalender-Hinweis nach Buchung abgelehnt – nicht erneut fragen.
+  calendarSyncTennisPromptDismissed Boolean @default(false)
+  createdAt             DateTime           @default(now())
+  courtReservations     CourtReservation[]
+  deviceReservations    DeviceReservation[]
+  sections              UserSection[]
+  sectionAdminOf        SectionAdmin[]
+  createdCourses        Course[]           @relation("CourseCreator")
+  createdPlans          SubscriptionPlan[] @relation("PlanCreator")
+  subscriptions         Subscription[]     @relation("SubscriptionHolder")
+  purchasedPlans        Subscription[]     @relation("SubscriptionPayer")
+  enrollments           Enrollment[]       @relation("EnrollmentHolder")
+  purchasedCourses      Enrollment[]       @relation("EnrollmentPayer")
+  managedById           String?
+  managedBy             User?              @relation("FamilyDependents", fields: [managedById], references: [id], onDelete: Cascade)
+  dependents            User[]             @relation("FamilyDependents")
+  creditTransactions    CreditTransaction[]
+  supportTickets        SupportTicket[]    @relation("TicketCreator")
+  closedSupportTickets  SupportTicket[]    @relation("TicketClosedBy")
+  pendingRefundTransfers PendingRefundTransfer[] @relation("RefundRecipient")
+  confirmedRefundTransfers PendingRefundTransfer[] @relation("RefundConfirmer")
+  accountingExclusions  AccountingExclusion[]  @relation("AccountingExclusions")
+  tennisWhatsAppResponses TennisWhatsAppResponse[]
+  clubEventsCreated     ClubEvent[]        @relation("ClubEventCreator")
+  clubEventReads        ClubEventRead[]
+
+  @@index([managedById])
+  @@index([lastLoginAt])
+}
+
+enum TennisWhatsAppChoice {
+  ALREADY_MEMBER
+  NO_INTEREST
+}
+
+/// Klick-Antworten zur Tennis-WhatsApp-Gruppe (Auswertung im Tennis-Reporting).
+model TennisWhatsAppResponse {
+  id        String               @id @default(cuid())
+  choice    TennisWhatsAppChoice
+  /// payment_success | tennis_page
+  source    String
+  userId    String?
+  createdAt DateTime             @default(now())
+  user      User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([choice])
+  @@index([createdAt])
+  @@index([userId])
+}
+
+/// Zahlungseingang, den ein Haupt-Admin aus der Buchhaltung entfernt hat.
+model AccountingExclusion {
+  paymentKey   String   @id
+  excludedById String
+  createdAt    DateTime @default(now())
+  excludedBy   User     @relation("AccountingExclusions", fields: [excludedById], references: [id], onDelete: Restrict)
+
+  @@index([excludedById])
+}
+
+model CreditTransaction {
+  id           String                @id @default(cuid())
+  userId       String
+  amountCents  Int
+  kind         CreditTransactionKind
+  description  String
+  enrollmentId String?
+  subscriptionId String?
+  courtReservationId String?
+  deviceReservationId String?
+  createdAt    DateTime              @default(now())
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([subscriptionId])
+  @@index([courtReservationId])
+  @@index([deviceReservationId])
+}
+
+model Section {
+  id                 String         @id @default(cuid())
+  name               String         @unique
+  paymentEnvKey      String?        @unique
+  sortOrder          Int            @default(0)
+  /// Kartenfarbe aller Kurse dieser Sektion.
+  accent             String         @default("red")
+  createdAt          DateTime       @default(now())
+  members            UserSection[]
+  admins             SectionAdmin[]
+  courses            Course[]
+  plans              SubscriptionPlan[]
+  courts             Court[]
+  devices            Device[]
+  clubEvents         ClubEventSection[]
+
+  @@index([sortOrder])
+}
+
+model UserSection {
+  id        String  @id @default(cuid())
+  userId    String
+  sectionId String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  section   Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sectionId])
+}
+
+model SectionAdmin {
+  id        String  @id @default(cuid())
+  userId    String
+  sectionId String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  section   Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sectionId])
+}
+
+model Course {
+  id                   String        @id @default(cuid())
+  title                String
+  /// Optionaler Name auf Bestätigung (leer = title). Platzhalter {year} = Perioden-/Kursjahr.
+  confirmationTitle    String?
+  description          String
+  priceCents           Int
+  childPriceCents      Int?
+  childMaxAge          Int           @default(18)
+  location             String        @default("")
+  /// ISO-Wochentage 1 = Montag … 7 = Sonntag. Leer = keine wiederkehrende Kurszeit.
+  scheduleWeekdays     Int[]         @default([])
+  /// Beginn der Kursstunde, Minuten seit Mitternacht (Europe/Rome).
+  scheduleStartMinute  Int?
+  /// Ende der Kursstunde, Minuten seit Mitternacht (Europe/Rome).
+  scheduleEndMinute    Int?
+  startsAt             DateTime?
+  endsAt               DateTime?
+  /// Tage vor Kursbeginn, bis wann Stornierung möglich ist. null = keine Stornierung.
+  cancelDeadlineDaysBeforeStart Int? @default(7)
+  registrationDeadline DateTime?
+  audienceMinAge       Int?
+  audienceMaxAge       Int?
+  maxParticipants      Int?
+  requiresMedicalCertificate Boolean @default(false)
+  /// Allgemein: für den Kurs werden Teilnehmerdokumente erwartet.
+  requiresDocuments        Boolean @default(false)
+  requiresPassportPhoto    Boolean @default(false)
+  requiresIdFront          Boolean @default(false)
+  requiresIdBack           Boolean @default(false)
+  requiresHealthCard       Boolean @default(false)
+  /// Einzahlungsbestätigung geht immer raus, sobald die Buchung bezahlt ist.
+  sendConfirmationEmail Boolean @default(true)
+  /// Überweisung als Zahlungsart anbieten (Stripe/Karte ist immer möglich, falls Sektion Stripe hat).
+  allowBankTransfer    Boolean       @default(false)
+  /// Ohne Vereinsmitgliedschaft buchbar (nur Haupt-Admin schaltbar).
+  allowWithoutMembership Boolean     @default(false)
+  /// Optional: mit Kurskauf wird dieses Abo (z. B. Mitgliedschaft) mitaktiviert.
+  bundledPlanId        String?
+  published            Boolean       @default(true)
+  accent               String        @default("rust")
+  sectionId            String?
+  createdById          String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  section     Section?      @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  createdBy   User?         @relation("CourseCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  bundledPlan SubscriptionPlan? @relation("CourseBundledPlan", fields: [bundledPlanId], references: [id], onDelete: SetNull)
+  enrollments Enrollment[]
+
+  @@index([bundledPlanId])
+}
+
+model Enrollment {
+  id                       String           @id @default(cuid())
+  userId                   String
+  courseId                 String
+  status                   EnrollmentStatus @default(PENDING)
+  paymentMethod            PaymentMethod?
+  paymentReference         String?
+  bankTransferGroupId      String?
+  bankTransferApprovedAt   DateTime?
+  bankTransferApprovedById String?
+  stripeSessionId          String?
+  createdAt                DateTime         @default(now())
+  /// Zeitpunkt der letzten Statusänderung (Buchung, Zahlung, Storno, …).
+  statusChangedAt          DateTime         @default(now())
+  paidAt                   DateTime?
+  purchasedById            String?
+  paidCents                Int?
+  creditAppliedCents       Int                @default(0)
+  stripeFeeCents           Int?
+  /// Gesetz, sobald der Kartenbetrag abzüglich Stripe-Gebühr erstattet wurde.
+  cardRefundedAt           DateTime?
+  attestConfirmedAt        DateTime?
+  confirmationEmailSentAt  DateTime?
+  bundledPlanGrantedAt     DateTime?
+  offerExpiresAt           DateTime?
+  waitlistOfferToken       String?            @unique
+  promotedAt               DateTime?
+  user                     User             @relation("EnrollmentHolder", fields: [userId], references: [id], onDelete: Cascade)
+  purchasedBy              User?            @relation("EnrollmentPayer", fields: [purchasedById], references: [id], onDelete: SetNull)
+  course                   Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  documents                EnrollmentDocument[]
+
+  @@unique([userId, courseId])
+  @@index([purchasedById])
+  @@index([paymentReference])
+  @@index([bankTransferGroupId])
+}
+
+enum EnrollmentDocumentKind {
+  MEDICAL_CERTIFICATE
+  PASSPORT_PHOTO
+  ID_FRONT
+  ID_BACK
+  HEALTH_CARD
+}
+
+model EnrollmentDocument {
+  id           String                 @id @default(cuid())
+  enrollmentId String
+  kind         EnrollmentDocumentKind @default(MEDICAL_CERTIFICATE)
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  storageKey   String                 @unique
+  uploadedAt   DateTime               @default(now())
+  uploadedById String
+  enrollment   Enrollment             @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, kind])
+  @@index([uploadedById])
+}
+
+model Court {
+  id                String             @id @default(cuid())
+  name              String
+  category          String             @default("Freiluft")
+  sortOrder         Int                @default(0)
+  active            Boolean            @default(true)
+  blocked           Boolean            @default(false)
+  priceCentsPerHour            Int                @default(1500)
+  cancelRefundMinutesBeforeStart Int              @default(120)
+  sectionId                    String?
+  createdAt         DateTime           @default(now())
+  section           Section?           @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  reservations      CourtReservation[]
+}
+
+model CourtReservation {
+  id              String            @id @default(cuid())
+  courtId         String
+  userId          String?
+  guestName       String?
+  guestEmail      String?
+  /// Öffentliche Bezeichnung (z. B. „Training“) – ersetzt den Namen im Kalender.
+  label           String?
+  /// Gemeinsame ID aller Termine einer Admin-Serie.
+  seriesId        String?
+  startsAt        DateTime
+  endsAt          DateTime
+  partnerName     String?
+  priceCents      Int               @default(0)
+  creditAppliedCents Int            @default(0)
+  stripeFeeCents     Int?
+  paidAt          DateTime?
+  stripeSessionId String?
+  /// Gesetz, sobald der Kartenbetrag abzüglich Stripe-Gebühr erstattet wurde.
+  cardRefundedAt  DateTime?
+  /** Fortlaufende Nummer der italienischen Tennis-Ricevuta (nur bei Zahlung) */
+  receiptNumber   Int?              @unique
+  receiptEmailSentAt DateTime?
+  status          ReservationStatus @default(CONFIRMED)
+  createdAt       DateTime          @default(now())
+  court           Court             @relation(fields: [courtId], references: [id], onDelete: Cascade)
+  user            User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([courtId, startsAt])
+  @@index([userId, startsAt])
+  @@index([stripeSessionId])
+  @@index([seriesId])
+}
+
+enum DevicePricingMode {
+  HOURLY
+  DAILY
+}
+
+model Device {
+  id          String               @id @default(cuid())
+  name        String
+  category    String               @default("Fahrzeug")
+  sortOrder   Int                  @default(0)
+  active      Boolean              @default(true)
+  blocked     Boolean              @default(false)
+  pricingMode DevicePricingMode    @default(DAILY)
+  priceCents  Int                  @default(5000)
+  sectionId   String?
+  createdAt   DateTime             @default(now())
+  section     Section?             @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  reservations DeviceReservation[]
+}
+
+model DeviceReservation {
+  id              String            @id @default(cuid())
+  deviceId        String
+  userId          String
+  startsAt        DateTime
+  endsAt          DateTime
+  billingMode     DevicePricingMode
+  /// Zweck / Grund der Reservierung (für alle mit Fuhrpark-Recht sichtbar).
+  reason          String            @default("")
+  priceCents      Int               @default(0)
+  creditAppliedCents Int            @default(0)
+  stripeFeeCents     Int?
+  paidAt          DateTime?
+  stripeSessionId String?
+  status          ReservationStatus @default(CONFIRMED)
+  createdAt       DateTime          @default(now())
+  device          Device            @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, startsAt])
+  @@index([userId, startsAt])
+  @@index([stripeSessionId])
+}
+
+enum SubscriptionInterval {
+  MINUTELY
+  DAILY
+  MONTHLY
+  YEARLY
+  YEARLY_CALENDAR
+  YEARLY_ROLLING
+}
+
+enum SubscriptionStatus {
+  PENDING
+  SCHEDULED
+  ACTIVE
+  CANCELLED
+}
+
+enum PlanKind {
+  MEMBERSHIP
+  ADDON
+}
+
+enum PlanPricingMode {
+  PER_PERSON
+  FAMILY_BUNDLE
+}
+
+model SubscriptionPlan {
+  id               String                @id @default(cuid())
+  title            String
+  /// Optionaler Name auf Bestätigung (leer = title). Platzhalter {year} = Periodenjahr.
+  confirmationTitle String?
+  description      String
+  priceCents       Int
+  childPriceCents  Int?
+  childMaxAge      Int                   @default(18)
+  /// Leer = alle Altersgruppen. Wie bei Kursen: z. B. Höchstalter 18 nur für Kinder.
+  audienceMinAge   Int?
+  audienceMaxAge   Int?
+  pricingMode      PlanPricingMode       @default(PER_PERSON)
+  familyPriceCents Int?
+  familyAdults     Int?
+  familyChildren   Int?
+  interval         SubscriptionInterval
+  kind             PlanKind              @default(ADDON)
+  location         String                @default("ASC Lajen")
+  published        Boolean               @default(true)
+  accent           String                @default("green")
+  autoRenewOffered Boolean               @default(false)
+  /// Nach erfolgreichem Kauf Bestätigungs-E-Mail an das Mitglied senden.
+  sendConfirmationEmail Boolean          @default(false)
+  /// Überweisung als Zahlungsart anbieten (Stripe/Karte ist immer möglich, falls Sektion Stripe hat).
+  allowBankTransfer Boolean              @default(false)
+  /// Öffentliche Anzeige ab diesem Datum (leer = sofort, sobald veröffentlicht).
+  visibleFrom      DateTime?
+  /// Öffentliche Anzeige bis einschließlich dieses Datums (leer = unbegrenzt).
+  visibleUntil     DateTime?
+  sectionId        String?
+  createdById      String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  section          Section?              @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  createdBy        User?                 @relation("PlanCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  subscriptions    Subscription[]
+  bundledInCourses Course[]              @relation("CourseBundledPlan")
+}
+
+model Subscription {
+  id                       String                 @id @default(cuid())
+  userId                   String
+  planId                   String
+  status                   SubscriptionStatus     @default(PENDING)
+  autoRenew                Boolean                @default(false)
+  paymentMethod            PaymentMethod?
+  paymentReference         String?
+  bankTransferGroupId      String?
+  bankTransferApprovedAt   DateTime?
+  bankTransferApprovedById String?
+  periodStart              DateTime?
+  periodEnd                DateTime?
+  stripeSessionId          String?
+  stripeSubscriptionId     String?
+  stripeCustomerId         String?
+  paidCents                Int?
+  creditAppliedCents       Int                @default(0)
+  /// Folgeperioden aus Kurs-Folge-Abo: werden bei Periodenende ohne Zahlung verbraucht.
+  prepaidRenewalCredits    Int                @default(0)
+  purchasedById            String?
+  membershipCardSentAt     DateTime?
+  confirmationEmailSentAt  DateTime?
+  createdAt                DateTime               @default(now())
+  paidAt                   DateTime?
+  user                     User                   @relation("SubscriptionHolder", fields: [userId], references: [id], onDelete: Cascade)
+  purchasedBy              User?                  @relation("SubscriptionPayer", fields: [purchasedById], references: [id], onDelete: SetNull)
+  plan                     SubscriptionPlan       @relation(fields: [planId], references: [id], onDelete: Cascade)
+  payments                 SubscriptionPayment[]
+
+  @@index([userId, planId])
+  @@index([stripeSubscriptionId])
+  @@index([stripeCustomerId])
+  @@index([purchasedById])
+  @@index([paymentReference])
+  @@index([bankTransferGroupId])
+}
+
+model SubscriptionPayment {
+  id              String       @id @default(cuid())
+  subscriptionId  String
+  amountCents     Int
+  paidAt          DateTime     @default(now())
+  source          String
+  stripePaymentId String?
+  stripeFeeCents  Int?
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId, paidAt])
+}
+
+enum SupportTicketStatus {
+  OPEN
+  CLOSED
+}
+
+model SupportTicket {
+  id         String               @id @default(cuid())
+  subject    String
+  message    String
+  status     SupportTicketStatus  @default(OPEN)
+  userId     String
+  user       User                 @relation("TicketCreator", fields: [userId], references: [id], onDelete: Cascade)
+  closedAt   DateTime?
+  closedById String?
+  closedBy   User?                @relation("TicketClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  createdAt  DateTime             @default(now())
+
+  @@index([createdAt])
+  @@index([userId])
+  @@index([status])
+  @@index([closedById])
+}
+
+/** Merker: für diesen Kalendertag wurde bereits eine Ticket-Mail versendet. */
+model SupportTicketDailyNotify {
+  dayKey    String   @id
+  ticketId  String
+  sentAt    DateTime @default(now())
+}
+
+/** Allzeit-Höchststand einer Hosting-Metrik (Admin → Hosting). */
+model HostingMetricPeak {
+  metricId   String   @id
+  peakValue  Float
+  peakLabel  String
+  peakedAt   DateTime
+}
+
+/**
+ * Rücküberweisung nach Storno (Kurs/Fuhrpark/Abo).
+ * Zwischenzeitlich Guthaben auf dem Konto; auszahlbar erst nach Bestätigung
+ * (Überweisung: Originalbetrag, Stripe: Netto nach Gebühren).
+ * Tennisplatz-Stornos landen hier nicht: der Kartenbetrag geht abzüglich
+ * Stripe-Gebühr direkt über Stripe zurück.
+ */
+model PendingRefundTransfer {
+  id                  String              @id @default(cuid())
+  userId              String
+  kind                PendingRefundKind
+  status              PendingRefundStatus @default(PENDING)
+  enrollmentId        String?
+  deviceReservationId String?
+  subscriptionId      String?
+  paymentMethod       PaymentMethod?
+  /// Ursprünglich eingegangener Betrag (ohne Guthabenanteil).
+  externalCents       Int
+  stripeFeeCents      Int                 @default(0)
+  /// Zurückzuweisen: Bank = external, Stripe = external − Gebühren.
+  payoutCents         Int
+  /// Dem Nutzer gutgeschriebener Betrag (wird bei Bestätigung wieder abgezogen).
+  creditedCents       Int
+  title               String
+  sectionId           String?
+  memberName          String              @default("")
+  payerName           String?
+  createdAt           DateTime            @default(now())
+  confirmedAt         DateTime?
+  confirmedById       String?
+  user                User                @relation("RefundRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  confirmedBy         User?               @relation("RefundConfirmer", fields: [confirmedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([userId, status])
+  @@index([enrollmentId])
+  @@index([deviceReservationId])
+  @@index([subscriptionId])
+  @@index([sectionId])
+}
+
+/// Hinweis eines Haupt-Admins (z. B. Sitzung), sichtbar im gewählten Zeitraum.
+model ClubEvent {
+  id           String             @id @default(cuid())
+  body         String
+  /// Veröffentlichung ab diesem Zeitpunkt (Beginn des Kalendertags, Europe/Rome).
+  startsAt     DateTime
+  /// Veröffentlichung bis zu diesem Zeitpunkt (Ende des Kalendertags, Europe/Rome).
+  endsAt       DateTime
+  /// Alle angemeldeten Nutzer.
+  audienceAll  Boolean            @default(false)
+  /// Nur Haupt-Admins (Rolle ADMIN).
+  audienceAdmins Boolean          @default(false)
+  /// Personen mit aktiver Vereinsmitgliedschaft (Sportverein).
+  audienceClub Boolean            @default(false)
+  /// Optionales Bild unter uploads/events.
+  imageStorageKey String?
+  imageMimeType   String?
+  createdById  String?
+  createdAt    DateTime           @default(now())
+  createdBy    User?              @relation("ClubEventCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  sections     ClubEventSection[]
+  reads        ClubEventRead[]
+
+  @@index([startsAt, endsAt])
+  @@index([createdById])
+}
+
+/// Sektionen, deren Mitglieder (aktives Sektions-Abo) den Hinweis sehen.
+model ClubEventSection {
+  eventId   String
+  sectionId String
+  event     ClubEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  section   Section   @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, sectionId])
+  @@index([sectionId])
+}
+
+/// Nutzer hat „Gelesen“ geklickt – der Hinweis wird nicht mehr angezeigt.
+model ClubEventRead {
+  eventId String
+  userId  String
+  readAt  DateTime  @default(now())
+  event   ClubEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, userId])
+  @@index([userId])
+}
