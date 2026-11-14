@@ -5,7 +5,7 @@ import { WaitlistOfferCheckout } from "@/components/waitlist-offer-checkout";
 import { validateWaitlistOfferAccess } from "@/app/actions/waitlist";
 import { getCurrentUser } from "@/lib/auth";
 import { canActFor } from "@/lib/family";
-import { getCreditBalance } from "@/lib/credit";
+import { getSectionCreditBalance } from "@/lib/section-credit";
 import { isSectionBankConfigured, isSectionStripeConfigured } from "@/lib/section-payments";
 import { prisma } from "@/lib/prisma";
 
@@ -74,7 +74,10 @@ export default async function WaitlistOfferPage({
     );
   }
 
-  const creditBalanceCents = await getCreditBalance(user.id);
+  const creditBalanceCents = await getSectionCreditBalance(
+    user.id,
+    enrollment.course.sectionId,
+  );
   const priceCents = enrollment.paidCents ?? 0;
   const stripeAvailable = await isSectionStripeConfigured(
     enrollment.course.sectionId,

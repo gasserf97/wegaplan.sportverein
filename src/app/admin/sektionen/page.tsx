@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import {
   SectionAccentForm,
   SectionCreateForm,
+  SectionCreditToggle,
   SectionDeleteButton,
   SectionMoveButtons,
   SectionPaymentsForm,
@@ -147,6 +148,10 @@ export default async function SectionsAdminPage() {
                     <SectionDeleteButton sectionId={section.id} />
                   </div>
                 </div>
+                <SectionCreditToggle
+                  sectionId={section.id}
+                  creditAllowed={section.creditAllowed}
+                />
                 <SectionPaymentsForm
                   sectionId={section.id}
                   sectionName={section.name}

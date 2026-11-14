@@ -6,6 +6,7 @@ import {
   deleteSectionAction,
   moveSectionAction,
   updateSectionAccentAction,
+  updateSectionCreditAllowedAction,
   updateSectionPaymentEnvKeyAction,
   type ActionState,
   type SectionPaymentEnvState,
@@ -123,6 +124,56 @@ export function SectionAccentForm({
           });
         }}
       />
+      {error ? <span className="text-xs text-destructive">{error}</span> : null}
+    </div>
+  );
+}
+
+export function SectionCreditToggle({
+  sectionId,
+  creditAllowed,
+}: {
+  sectionId: string;
+  creditAllowed: boolean;
+}) {
+  const [pending, start] = useTransition();
+  const [enabled, setEnabled] = useState(creditAllowed);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <div className="mt-4 grid gap-1 border-t border-border pt-4">
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={enabled}
+          disabled={pending}
+          onChange={(event) => {
+            const next = event.target.checked;
+            setEnabled(next);
+            setError(null);
+            start(async () => {
+              const result = await updateSectionCreditAllowedAction(
+                sectionId,
+                next,
+              );
+              if (result && "error" in result) {
+                setEnabled(!next);
+                setError(result.error);
+              }
+            });
+          }}
+        />
+        <span>
+          <span className="font-medium">Guthaben möglich</span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            Aktiv: eine fehlgeschlagene Kartenerstattung geht auf das
+            Guthabenkonto dieser Sektion und gilt nur für Buchungen der
+            Sektion. Inaktiv: der Betrag steht unter Zurückzuweisende
+            Überweisungen. Standard ist aus.
+          </span>
+        </span>
+      </label>
       {error ? <span className="text-xs text-destructive">{error}</span> : null}
     </div>
   );

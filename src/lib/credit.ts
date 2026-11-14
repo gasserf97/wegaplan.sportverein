@@ -1,4 +1,4 @@
-import { type CreditTransactionKind } from "@/generated/prisma/client";
+import { type CreditTransactionKind, type Prisma } from "@/generated/prisma/client";
 import { sendCourseEnrollmentConfirmations } from "@/lib/booking-confirmation";
 import { enrollmentCreditRefundCents } from "@/lib/payment-amounts";
 import { prisma } from "@/lib/prisma";
@@ -79,7 +79,71 @@ type CreditLedger = {
   subscriptionId?: string;
   courtReservationId?: string;
   deviceReservationId?: string;
+  sectionId?: string | null;
 };
+
+/** Zieht zuerst vom Sektionsguthaben ab, den Rest vom Vereinsguthaben. */
+async function drawCredit(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  amountCents: number,
+  ledger: CreditLedger,
+) {
+  let remaining = amountCents;
+  const sectionId = ledger.sectionId ?? null;
+  if (sectionId && remaining > 0) {
+    const account = await tx.sectionCreditAccount.findUnique({
+      where: { userId_sectionId: { userId, sectionId } },
+      select: { balanceCents: true },
+    });
+    const take = Math.min(account?.balanceCents ?? 0, remaining);
+    if (take > 0) {
+      await tx.sectionCreditAccount.update({
+        where: { userId_sectionId: { userId, sectionId } },
+        data: { balanceCents: { decrement: take } },
+      });
+      await tx.creditTransaction.create({
+        data: {
+          userId,
+          sectionId,
+          amountCents: take,
+          kind: "PAYMENT",
+          description: ledger.description,
+          enrollmentId: ledger.enrollmentId ?? null,
+          subscriptionId: ledger.subscriptionId ?? null,
+          courtReservationId: ledger.courtReservationId ?? null,
+          deviceReservationId: ledger.deviceReservationId ?? null,
+        },
+      });
+      remaining -= take;
+    }
+  }
+
+  if (remaining <= 0) return;
+  const payer = await tx.user.findUnique({
+    where: { id: userId },
+    select: { creditBalanceCents: true },
+  });
+  if (!payer || payer.creditBalanceCents < remaining) {
+    throw new Error("Nicht genug Guthaben.");
+  }
+  await tx.user.update({
+    where: { id: userId },
+    data: { creditBalanceCents: { decrement: remaining } },
+  });
+  await tx.creditTransaction.create({
+    data: {
+      userId,
+      amountCents: remaining,
+      kind: "PAYMENT",
+      description: ledger.description,
+      enrollmentId: ledger.enrollmentId ?? null,
+      subscriptionId: ledger.subscriptionId ?? null,
+      courtReservationId: ledger.courtReservationId ?? null,
+      deviceReservationId: ledger.deviceReservationId ?? null,
+    },
+  });
+}
 
 export async function addCreditBalance(
   userId: string,
@@ -131,42 +195,98 @@ export async function addCreditRefundOnce(
   return amountCents;
 }
 
+/** Legt verbrauchtes Guthaben auf dasselbe Konto zurück (Sektion oder Verein). */
+export async function restoreSpentCredit(
+  userId: string,
+  amountCents: number,
+  ledger: CreditLedger,
+) {
+  if (amountCents <= 0) return 0;
+  const existing = await prisma.creditTransaction.findFirst({
+    where: {
+      userId,
+      kind: "REFUND",
+      description: ledger.description,
+      ...(ledger.enrollmentId ? { enrollmentId: ledger.enrollmentId } : {}),
+      ...(ledger.courtReservationId
+        ? { courtReservationId: ledger.courtReservationId }
+        : {}),
+    },
+    select: { id: true },
+  });
+  if (existing) return 0;
+
+  const payments = await prisma.creditTransaction.findMany({
+    where: {
+      userId,
+      kind: "PAYMENT",
+      ...(ledger.enrollmentId ? { enrollmentId: ledger.enrollmentId } : {}),
+      ...(ledger.courtReservationId
+        ? { courtReservationId: ledger.courtReservationId }
+        : {}),
+      ...(ledger.subscriptionId ? { subscriptionId: ledger.subscriptionId } : {}),
+      ...(ledger.deviceReservationId
+        ? { deviceReservationId: ledger.deviceReservationId }
+        : {}),
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  if (payments.length === 0) {
+    await addCreditBalance(userId, amountCents, ledger);
+    return amountCents;
+  }
+
+  let left = amountCents;
+  await prisma.$transaction(async (tx) => {
+    for (const payment of payments) {
+      if (left <= 0) break;
+      const take = Math.min(left, payment.amountCents);
+      if (take <= 0) continue;
+      if (payment.sectionId) {
+        await tx.sectionCreditAccount.upsert({
+          where: {
+            userId_sectionId: { userId, sectionId: payment.sectionId },
+          },
+          create: {
+            userId,
+            sectionId: payment.sectionId,
+            balanceCents: take,
+          },
+          update: { balanceCents: { increment: take } },
+        });
+      } else {
+        await tx.user.update({
+          where: { id: userId },
+          data: { creditBalanceCents: { increment: take } },
+        });
+      }
+      await tx.creditTransaction.create({
+        data: {
+          userId,
+          sectionId: payment.sectionId,
+          amountCents: take,
+          kind: "REFUND",
+          description: ledger.description,
+          enrollmentId: ledger.enrollmentId ?? null,
+          subscriptionId: ledger.subscriptionId ?? null,
+          courtReservationId: ledger.courtReservationId ?? null,
+          deviceReservationId: ledger.deviceReservationId ?? null,
+        },
+      });
+      left -= take;
+    }
+  });
+  return amountCents - left;
+}
+
 export async function spendCreditBalance(
   userId: string,
   amountCents: number,
-  ledger: {
-    description: string;
-    enrollmentId?: string;
-    subscriptionId?: string;
-    courtReservationId?: string;
-    deviceReservationId?: string;
-  },
+  ledger: CreditLedger,
 ) {
   if (amountCents <= 0) return;
   await prisma.$transaction(async (tx) => {
-    const payer = await tx.user.findUnique({
-      where: { id: userId },
-      select: { creditBalanceCents: true },
-    });
-    if (!payer || payer.creditBalanceCents < amountCents) {
-      throw new Error("Nicht genug Guthaben.");
-    }
-    await tx.user.update({
-      where: { id: userId },
-      data: { creditBalanceCents: { decrement: amountCents } },
-    });
-    await tx.creditTransaction.create({
-      data: {
-        userId,
-        amountCents,
-        kind: "PAYMENT",
-        description: ledger.description,
-        enrollmentId: ledger.enrollmentId ?? null,
-        subscriptionId: ledger.subscriptionId ?? null,
-        courtReservationId: ledger.courtReservationId ?? null,
-        deviceReservationId: ledger.deviceReservationId ?? null,
-      },
-    });
+    await drawCredit(tx, userId, amountCents, ledger);
   });
 }
 
@@ -174,12 +294,14 @@ export async function reserveSubscriptionCreditForBankTransfer(
   payerUserId: string,
   allocations: ItemCreditAllocation[],
   planTitle: string,
+  sectionId?: string | null,
 ) {
   for (const allocation of allocations) {
     if (allocation.creditCents <= 0) continue;
     await spendCreditBalance(payerUserId, allocation.creditCents, {
       description: `Mitgliedschaft (Überweisung ausstehend): ${planTitle}`,
       subscriptionId: allocation.itemId,
+      sectionId,
     });
   }
 }
@@ -194,7 +316,7 @@ export async function finalizeSubscriptionPayments(
       id: true,
       paidCents: true,
       creditAppliedCents: true,
-      plan: { select: { title: true, priceCents: true } },
+      plan: { select: { title: true, priceCents: true, sectionId: true } },
       user: { select: { name: true } },
     },
   });
@@ -216,35 +338,13 @@ export async function finalizeSubscriptionPayments(
     const needingDeduction = subscriptions.filter(
       (item) => item.creditAppliedCents > 0 && !alreadyReserved.has(item.id),
     );
-    const totalCredit = needingDeduction.reduce(
-      (sum, item) => sum + item.creditAppliedCents,
-      0,
-    );
 
-    if (totalCredit > 0) {
-      const payer = await tx.user.findUnique({
-        where: { id: payerUserId },
-        select: { creditBalanceCents: true },
+    for (const subscription of needingDeduction) {
+      await drawCredit(tx, payerUserId, subscription.creditAppliedCents, {
+        description: `Mitgliedschaft: ${subscription.plan.title} (${subscription.user.name})`,
+        subscriptionId: subscription.id,
+        sectionId: subscription.plan.sectionId,
       });
-      if (!payer || payer.creditBalanceCents < totalCredit) {
-        throw new Error("Nicht genug Guthaben.");
-      }
-      await tx.user.update({
-        where: { id: payerUserId },
-        data: { creditBalanceCents: { decrement: totalCredit } },
-      });
-
-      for (const subscription of needingDeduction) {
-        await tx.creditTransaction.create({
-          data: {
-            userId: payerUserId,
-            amountCents: subscription.creditAppliedCents,
-            kind: "PAYMENT",
-            description: `Mitgliedschaft: ${subscription.plan.title} (${subscription.user.name})`,
-            subscriptionId: subscription.id,
-          },
-        });
-      }
     }
   });
 }
@@ -257,7 +357,7 @@ export async function finalizeCourtReservationPayment(
     where: { id: reservationId },
     select: {
       creditAppliedCents: true,
-      court: { select: { name: true } },
+      court: { select: { name: true, sectionId: true } },
     },
   });
   if (!reservation || reservation.creditAppliedCents <= 0) return;
@@ -271,6 +371,7 @@ export async function finalizeCourtReservationPayment(
   await spendCreditBalance(payerUserId, reservation.creditAppliedCents, {
     description: `Tennisplatz: ${reservation.court.name}`,
     courtReservationId: reservationId,
+    sectionId: reservation.court.sectionId,
   });
 }
 
@@ -282,7 +383,7 @@ export async function finalizeDeviceReservationPayment(
     where: { id: reservationId },
     select: {
       creditAppliedCents: true,
-      device: { select: { name: true } },
+      device: { select: { name: true, sectionId: true } },
     },
   });
   if (!reservation || reservation.creditAppliedCents <= 0) return;
@@ -296,6 +397,7 @@ export async function finalizeDeviceReservationPayment(
   await spendCreditBalance(payerUserId, reservation.creditAppliedCents, {
     description: `Fuhrpark: ${reservation.device.name}`,
     deviceReservationId: reservationId,
+    sectionId: reservation.device.sectionId,
   });
 }
 
@@ -303,12 +405,14 @@ export async function reserveCourseCreditForBankTransfer(
   payerUserId: string,
   allocations: CreditAllocation[],
   courseTitle: string,
+  sectionId?: string | null,
 ) {
   for (const allocation of allocations) {
     if (allocation.creditCents <= 0) continue;
     await spendCreditBalance(payerUserId, allocation.creditCents, {
       description: `Kursbuchung (Überweisung ausstehend): ${courseTitle}`,
       enrollmentId: allocation.enrollmentId,
+      sectionId,
     });
   }
 }
@@ -324,7 +428,7 @@ export async function finalizeCourseEnrollmentPayments(
       courseId: true,
       paidCents: true,
       creditAppliedCents: true,
-      course: { select: { title: true, priceCents: true } },
+      course: { select: { title: true, priceCents: true, sectionId: true } },
       user: { select: { name: true } },
     },
   });
@@ -346,35 +450,13 @@ export async function finalizeCourseEnrollmentPayments(
     const enrollmentsNeedingDeduction = enrollments.filter(
       (item) => item.creditAppliedCents > 0 && !alreadyReserved.has(item.id),
     );
-    const totalCredit = enrollmentsNeedingDeduction.reduce(
-      (sum, item) => sum + item.creditAppliedCents,
-      0,
-    );
 
-    if (totalCredit > 0) {
-      const payer = await tx.user.findUnique({
-        where: { id: payerUserId },
-        select: { creditBalanceCents: true },
+    for (const enrollment of enrollmentsNeedingDeduction) {
+      await drawCredit(tx, payerUserId, enrollment.creditAppliedCents, {
+        description: `Kursbuchung: ${enrollment.course.title} (${enrollment.user.name})`,
+        enrollmentId: enrollment.id,
+        sectionId: enrollment.course.sectionId,
       });
-      if (!payer || payer.creditBalanceCents < totalCredit) {
-        throw new Error("Nicht genug Guthaben.");
-      }
-      await tx.user.update({
-        where: { id: payerUserId },
-        data: { creditBalanceCents: { decrement: totalCredit } },
-      });
-
-      for (const enrollment of enrollmentsNeedingDeduction) {
-        await tx.creditTransaction.create({
-          data: {
-            userId: payerUserId,
-            amountCents: enrollment.creditAppliedCents,
-            kind: "PAYMENT",
-            description: `Kursbuchung: ${enrollment.course.title} (${enrollment.user.name})`,
-            enrollmentId: enrollment.id,
-          },
-        });
-      }
     }
 
     const now = new Date();
@@ -435,6 +517,7 @@ export async function loadCreditAccountsReport(): Promise<CreditAccountsReport> 
       username: true,
       creditBalanceCents: true,
       creditTransactions: {
+        where: { sectionId: null },
         orderBy: { createdAt: "desc" },
         select: {
           id: true,
@@ -447,21 +530,68 @@ export async function loadCreditAccountsReport(): Promise<CreditAccountsReport> 
       },
     },
   });
+  const sectionAccounts = await prisma.sectionCreditAccount.findMany({
+    where: { balanceCents: { gt: 0 } },
+    orderBy: [{ balanceCents: "desc" }, { user: { name: "asc" } }],
+    select: {
+      balanceCents: true,
+      section: { select: { id: true, name: true } },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          username: true,
+          creditTransactions: {
+            where: { sectionId: { not: null } },
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              amountCents: true,
+              kind: true,
+              description: true,
+              enrollmentId: true,
+              createdAt: true,
+              sectionId: true,
+            },
+          },
+        },
+      },
+    },
+  });
 
-  const totalCreditCents = users.reduce(
+  const globalCents = users.reduce(
     (sum, user) => sum + user.creditBalanceCents,
+    0,
+  );
+  const sectionCents = sectionAccounts.reduce(
+    (sum, account) => sum + account.balanceCents,
     0,
   );
 
   return {
-    totalCreditCents,
-    accounts: users.map((user) => ({
-      userId: user.id,
-      name: user.name,
-      email: user.email,
-      username: user.username,
-      creditBalanceCents: user.creditBalanceCents,
-      transactions: user.creditTransactions,
-    })),
+    totalCreditCents: globalCents + sectionCents,
+    accounts: [
+      ...users.map((user) => ({
+        userId: user.id,
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        sectionName: null,
+        creditBalanceCents: user.creditBalanceCents,
+        transactions: user.creditTransactions,
+      })),
+      ...sectionAccounts.map((account) => ({
+        userId: account.user.id,
+        name: account.user.name,
+        email: account.user.email,
+        username: account.user.username,
+        sectionName: account.section.name,
+        creditBalanceCents: account.balanceCents,
+        transactions: account.user.creditTransactions
+          .filter((item) => item.sectionId === account.section.id)
+          .map(({ sectionId: _sectionId, ...item }) => item),
+      })),
+    ],
   };
 }

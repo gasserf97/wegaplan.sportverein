@@ -111,7 +111,7 @@ export type IncomingPaymentBreakdown = {
 
 export type PendingRefundAccountingRow = {
   id: string;
-  kind: "course" | "device" | "subscription";
+  kind: "course" | "device" | "subscription" | "court";
   title: string;
   sectionId: string | null;
   sectionName: string;
@@ -1098,8 +1098,19 @@ export async function loadAccountingReport(
         item.subscriptionId ?? item.id.replace(/^plan-/, "");
       if (confirmedRefunds.subscriptionIds.has(subscriptionId)) return false;
     }
-    // Tennis: direkte Kartenrückerstattung, das Geld ist nicht mehr auf dem Konto.
-    if (item.kind === "court" && item.cardRefundedAt) return false;
+    // Tennis: direkte Kartenrückerstattung oder bestätigte Rücküberweisung.
+    if (item.kind === "court") {
+      if (item.cardRefundedAt) return false;
+      const courtReservationId = item.id.startsWith("court-")
+        ? item.id.slice("court-".length)
+        : "";
+      if (
+        courtReservationId &&
+        confirmedRefunds.courtReservationIds.has(courtReservationId)
+      ) {
+        return false;
+      }
+    }
     return true;
   });
   // Einnahmen = Kreditkarte + Überweisung (− bestätigte Rückerstattungen via Filter oben).
@@ -1158,7 +1169,9 @@ export async function loadAccountingReport(
           ? "course"
           : row.kind === "DEVICE"
             ? "device"
-            : "subscription",
+            : row.kind === "COURT"
+              ? "court"
+              : "subscription",
       title: row.title,
       sectionId: row.sectionId,
       sectionName: row.sectionId

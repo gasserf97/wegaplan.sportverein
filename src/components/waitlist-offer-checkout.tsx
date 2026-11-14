@@ -33,11 +33,14 @@ export function WaitlistOfferCheckout({
   const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentChoice>(
     stripeAvailable ? "stripe" : "bank_transfer",
   );
-  const [useCredit] = useState(false);
+  const [useCredit, setUseCredit] = useState(creditBalanceCents > 0);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  const creditApplied = 0;
+  const creditApplied =
+    useCredit && creditBalanceCents > 0
+      ? Math.min(creditBalanceCents, priceCents)
+      : 0;
   const cardCents = Math.max(0, priceCents - creditApplied);
 
   return (
@@ -49,6 +52,19 @@ export function WaitlistOfferCheckout({
       <p className="font-heading text-3xl">
         {priceCents === 0 ? "Kostenlos" : formatEuro(priceCents)}
       </p>
+      {creditBalanceCents > 0 && priceCents > 0 ? (
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-1 size-4 accent-primary"
+            checked={useCredit}
+            onChange={(event) => setUseCredit(event.target.checked)}
+          />
+          <span>
+            Guthaben dieser Sektion verwenden ({formatEuro(creditBalanceCents)})
+          </span>
+        </label>
+      ) : null}
       {cardCents > 0 ? (
         <div className="grid gap-2">
           {stripeAvailable ? (

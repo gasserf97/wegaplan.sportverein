@@ -70,8 +70,8 @@ export function FamilyPurchase({
   const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentChoice>(
     stripeAvailable ? "stripe" : "bank_transfer",
   );
-  const creditAllowed = false;
-  const [useCredit] = useState(false);
+  const creditAllowed = creditBalanceCents > 0;
+  const [useCredit, setUseCredit] = useState(creditBalanceCents > 0);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -92,7 +92,10 @@ export function FamilyPurchase({
       .reduce((sum, person) => sum + person.priceCents, 0);
   }, [people, selected, familyBundle, familyQuote]);
 
-  const creditApplied = 0;
+  const creditApplied =
+    creditAllowed && useCredit && total != null
+      ? Math.min(creditBalanceCents, total)
+      : 0;
   const amountDue = total == null ? null : Math.max(0, total - creditApplied);
 
   function toggle(id: string) {
@@ -236,6 +239,25 @@ export function FamilyPurchase({
           Diese Mitgliedschaft gilt für eine Periode ({intervalLabel}) ohne automatische
           Verlängerung.
         </p>
+      ) : null}
+      {creditAllowed ? (
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-1 size-4 accent-primary"
+            checked={useCredit}
+            onChange={(event) => setUseCredit(event.target.checked)}
+          />
+          <span>
+            Guthaben dieser Sektion verwenden ({formatEuro(creditBalanceCents)}{" "}
+            verfügbar)
+            {creditApplied > 0 ? (
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                {formatEuro(creditApplied)} werden vom Sektionsguthaben abgezogen.
+              </span>
+            ) : null}
+          </span>
+        </label>
       ) : null}
       <p className="text-sm">
         {creditApplied > 0 ? (

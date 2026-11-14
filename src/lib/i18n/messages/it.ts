@@ -526,7 +526,9 @@ export const it = {
     cancelConfirmCredit:
       "Annullare la prenotazione? Rimborso al netto dei costi di transazione.",
     cancelCardFallback:
-      "Il rimborso sulla carta non è riuscito. {amount} sono stati accreditati sul vostro credito.",
+      "Il rimborso sulla carta non è riuscito. {amount} sono stati accreditati sul credito di questa sezione.",
+    cancelCardPending:
+      "Il rimborso sulla carta non è riuscito. {amount} compaiono sotto „Bonifici da rimborsare“.",
     cancelThisOnly: "Solo questo appuntamento",
     cancelWholeSeries: "Tutta la serie",
     cancelSeriesQuestion:
@@ -1146,7 +1148,7 @@ export const it = {
     openEmpty: "Nessun bonifico aperto.",
     pendingRefundTitle: "Bonifici da rimborsare",
     pendingRefundDesc:
-      "Dopo lo storno (corso/veicolo): rimborsare e confermare qui. Bonifico = importo originale, Stripe = netto dopo commissioni. Solo dopo vengono sottratte entrate e credito per questa voce.",
+      "Dopo lo storno (corso/veicolo) o un rimborso carta non riuscito senza credito: rimborsare e confermare qui. Bonifico = importo originale, Stripe = netto dopo commissioni. Solo dopo vengono sottratte entrate e credito prenotato per questa voce.",
     pendingRefundEmpty: "Nessun rimborso aperto.",
     pendingRefundBankHint: "Importo originale del bonifico",
     pendingRefundStripeHint: "Netto (lordo {gross} − commissioni {fees})",

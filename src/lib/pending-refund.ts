@@ -1,5 +1,6 @@
 import type { PendingRefundKind, PaymentMethod } from "@/generated/prisma/client";
 import { spendCreditBalance } from "@/lib/credit";
+import { getSectionCreditBalance } from "@/lib/section-credit";
 import { externalPaymentDueCents } from "@/lib/payment-amounts";
 import { prisma } from "@/lib/prisma";
 import { resolveStripeFeeCents } from "@/lib/stripe-fees";
@@ -60,16 +61,22 @@ export async function getPendingRefundHoldCents(userId: string) {
   return rows.reduce((sum, row) => sum + Math.max(0, row.creditedCents), 0);
 }
 
-/** Für Tennisplätze nutzbares Guthaben (ohne offene Rücküberweisungen). */
-export async function getSpendableCourtCreditCents(userId: string) {
-  const [balance, hold] = await Promise.all([
+/** Für Tennisplätze nutzbares Guthaben (ohne offene Rücküberweisungen), plus Sektionsguthaben. */
+export async function getSpendableCourtCreditCents(
+  userId: string,
+  sectionId?: string | null,
+) {
+  const [balance, hold, sectionCredit] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { creditBalanceCents: true },
     }),
     getPendingRefundHoldCents(userId),
+    getSectionCreditBalance(userId, sectionId),
   ]);
-  return Math.max(0, (balance?.creditBalanceCents ?? 0) - hold);
+  return (
+    Math.max(0, (balance?.creditBalanceCents ?? 0) - hold) + sectionCredit
+  );
 }
 
 export async function createPendingRefundTransfer(input: {
@@ -87,6 +94,7 @@ export async function createPendingRefundTransfer(input: {
   enrollmentId?: string | null;
   deviceReservationId?: string | null;
   subscriptionId?: string | null;
+  courtReservationId?: string | null;
 }) {
   const external = Math.max(0, input.externalCents);
   // Nur wenn tatsächlich Geld zurücküberwiesen werden muss.
@@ -117,6 +125,7 @@ export async function createPendingRefundTransfer(input: {
       enrollmentId: input.enrollmentId ?? null,
       deviceReservationId: input.deviceReservationId ?? null,
       subscriptionId: input.subscriptionId ?? null,
+      courtReservationId: input.courtReservationId ?? null,
     },
   });
 }
@@ -154,6 +163,7 @@ export async function loadConfirmedCashRefundKeys() {
       enrollmentId: true,
       deviceReservationId: true,
       subscriptionId: true,
+      courtReservationId: true,
     },
   });
 
@@ -168,6 +178,9 @@ export async function loadConfirmedCashRefundKeys() {
     ),
     subscriptionIds: new Set(
       rows.map((row) => row.subscriptionId).filter(Boolean) as string[],
+    ),
+    courtReservationIds: new Set(
+      rows.map((row) => row.courtReservationId).filter(Boolean) as string[],
     ),
   };
 }
@@ -199,6 +212,7 @@ export async function confirmPendingRefundTransfer(
         enrollmentId: transfer.enrollmentId ?? undefined,
         deviceReservationId: transfer.deviceReservationId ?? undefined,
         subscriptionId: transfer.subscriptionId ?? undefined,
+        courtReservationId: transfer.courtReservationId ?? undefined,
       });
     }
   }

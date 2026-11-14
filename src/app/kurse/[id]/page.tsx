@@ -27,7 +27,7 @@ import {
   shouldShowMembershipNotices,
 } from "@/lib/membership";
 import { expireStalePendingEnrollments } from "@/lib/expire-pending";
-import { getCreditBalance } from "@/lib/credit";
+import { getSectionCreditBalance } from "@/lib/section-credit";
 import {
   childPriceAppliesToAllAges,
   courseCardDisplay,
@@ -216,7 +216,9 @@ export default async function CourseDetailPage({
     (user ? await hasActiveClubMembership(user.id) : false);
   const membershipBlocksSelf =
     Boolean(user) && requireMembership && !userHasClubMembership;
-  const creditBalanceCents = user ? await getCreditBalance(user.id) : 0;
+  const creditBalanceCents = user
+    ? await getSectionCreditBalance(user.id, course.sectionId)
+    : 0;
   const familyEnrollments = (
     user && family.length > 0
       ? await prisma.enrollment.findMany({

@@ -38,7 +38,12 @@ export type CancelReservationScope = "one" | "series";
 
 export type ReservationActionState =
   | { error: string }
-  | { ok: true; creditedCents?: number; cardRefundCreditedCents?: number }
+  | {
+      ok: true;
+      creditedCents?: number;
+      cardRefundCreditedCents?: number;
+      pendingRefundCents?: number;
+    }
   | { paymentUrl: string; reservationId: string }
   | null;
 
@@ -350,7 +355,9 @@ export async function createReservationAction(
   const priceCents = isFree
     ? 0
     : courtBookingPriceCents(court.priceCentsPerHour, startsAt, endsAt);
-  const creditBalance = useCredit ? await getSpendableCourtCreditCents(user.id) : 0;
+  const creditBalance = useCredit
+    ? await getSpendableCourtCreditCents(user.id, court.sectionId)
+    : 0;
   const creditAppliedCents = Math.min(creditBalance, priceCents);
 
   if (priceCents <= 0) {
@@ -492,12 +499,14 @@ export async function cancelReservationAction(
   const refundedIds: string[] = [];
   let restoredCreditCents = 0;
   let cardRefundCreditedCents = 0;
+  let pendingRefundCents = 0;
   for (const target of targets) {
     try {
       const refund = await refundPaidCourtReservation(target);
       restoredCreditCents +=
         refund.restoredCreditCents + refund.cardRefundCreditedCents;
       cardRefundCreditedCents += refund.cardRefundCreditedCents;
+      pendingRefundCents += refund.pendingRefundCents;
       if (refund.cardRefunded) refundedIds.push(target.id);
     } catch (error) {
       console.error("Tennisplatz-Erstattung", target.id, error);
@@ -527,6 +536,7 @@ export async function cancelReservationAction(
     ok: true,
     creditedCents: restoredCreditCents,
     cardRefundCreditedCents,
+    pendingRefundCents,
   };
 }
 
@@ -657,7 +667,10 @@ export async function toggleCourtBlockedAction(courtId: string) {
 
 export async function adminCancelReservationAction(
   reservationId: string,
-): Promise<{ error: string } | { ok: true; cardRefundCreditedCents: number }> {
+): Promise<
+  | { error: string }
+  | { ok: true; cardRefundCreditedCents: number; pendingRefundCents: number }
+> {
   const admin = await requireAdmin();
   if (!admin) return { error: "Nicht berechtigt." };
 
@@ -683,10 +696,12 @@ export async function adminCancelReservationAction(
 
   let cardRefunded = false;
   let cardRefundCreditedCents = 0;
+  let pendingRefundCents = 0;
   try {
     const refund = await refundPaidCourtReservation(reservation);
     cardRefunded = refund.cardRefunded;
     cardRefundCreditedCents = refund.cardRefundCreditedCents;
+    pendingRefundCents = refund.pendingRefundCents;
   } catch (error) {
     console.error("Tennisplatz-Erstattung", reservation.id, error);
     return {
@@ -705,7 +720,7 @@ export async function adminCancelReservationAction(
     },
   });
   revalidateBookingPaths();
-  return { ok: true, cardRefundCreditedCents };
+  return { ok: true, cardRefundCreditedCents, pendingRefundCents };
 }
 
 export async function deleteCourtAction(

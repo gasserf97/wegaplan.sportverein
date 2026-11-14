@@ -58,7 +58,10 @@ export function CreditAccountsSection({
       ) : (
         <ul className="mt-4 grid gap-3">
           {accounts.map((account) => (
-            <CreditAccountItem key={account.userId} account={account} />
+            <CreditAccountItem
+              key={`${account.userId}:${account.sectionName ?? "verein"}`}
+              account={account}
+            />
           ))}
         </ul>
       )}
@@ -73,9 +76,14 @@ function CreditAccountItem({ account }: { account: CreditAccountRow }) {
     <details className="group rounded-2xl bg-card ring-1 ring-foreground/10">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 [&::-webkit-details-marker]:hidden">
         <div className="min-w-0">
-          <p className="font-medium">{account.name}</p>
+          <p className="font-medium">
+            {account.name}
+            {account.sectionName ? ` · ${account.sectionName}` : ""}
+          </p>
           <p className="text-sm text-muted-foreground">
-            {account.email}
+            {account.sectionName
+              ? `Sektionsguthaben · ${account.email}`
+              : account.email}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
@@ -100,9 +108,11 @@ function CreditAccountItem({ account }: { account: CreditAccountRow }) {
 export function CreditBalanceSection({
   balanceCents,
   transactions,
+  sectionBalances = [],
 }: {
   balanceCents: number;
   transactions: AccountLedgerItem[];
+  sectionBalances?: { sectionId: string; name: string; balanceCents: number }[];
 }) {
   const { t } = useI18n();
 
@@ -136,6 +146,29 @@ export function CreditBalanceSection({
           <p className="mt-2 text-sm text-emerald-900">{t("account.creditUsageHint")}</p>
         ) : null}
       </div>
+
+      {sectionBalances.length > 0 ? (
+        <ul className="mt-3 grid gap-2">
+          {sectionBalances.map((section) => (
+            <li
+              key={section.sectionId}
+              className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3"
+            >
+              <div>
+                <p className="text-sm font-medium text-emerald-950">
+                  Guthaben {section.name}
+                </p>
+                <p className="text-xs text-emerald-900">
+                  Nur für Buchungen dieser Sektion.
+                </p>
+              </div>
+              <p className="font-heading text-2xl text-emerald-950">
+                {formatEuro(section.balanceCents)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       <h2 className="mt-8 text-2xl text-primary">{t("account.transactionsTitle")}</h2>
       <p className="mt-2 text-sm text-muted-foreground">

@@ -542,7 +542,9 @@ export const de = {
     cancelConfirmCredit:
       "Reservierung stornieren? Rückerstattung abzüglich Transaktionskosten.",
     cancelCardFallback:
-      "Die Rückerstattung auf die Karte ist fehlgeschlagen. {amount} wurden Ihrem Guthaben gutgeschrieben.",
+      "Die Rückerstattung auf die Karte ist fehlgeschlagen. {amount} wurden dem Guthaben dieser Sektion gutgeschrieben.",
+    cancelCardPending:
+      "Die Rückerstattung auf die Karte ist fehlgeschlagen. {amount} stehen unter „Zurückzuweisende Überweisungen“.",
     cancelThisOnly: "Nur diesen Termin",
     cancelWholeSeries: "Ganze Serie",
     cancelSeriesQuestion: "Nur diesen Termin oder die ganze Serie stornieren?",
@@ -1177,7 +1179,7 @@ export const de = {
     openEmpty: "Keine offenen Überweisungen.",
     pendingRefundTitle: "Zurückzuweisende Überweisungen",
     pendingRefundDesc:
-      "Nach Storno (Kurs/Fuhrpark): Betrag zurücküberweisen und hier bestätigen. Überweisung = Originalbetrag, Stripe = Netto nach Gebühren. Erst danach werden Einnahmen und Guthaben für diesen Eintrag abgezogen.",
+      "Nach Storno (Kurs/Fuhrpark) oder fehlgeschlagener Kartenerstattung ohne Guthaben: Betrag zurücküberweisen und hier bestätigen. Überweisung = Originalbetrag, Stripe = Netto nach Gebühren. Erst danach werden Einnahmen und vorgemerktes Guthaben für diesen Eintrag abgezogen.",
     pendingRefundEmpty: "Keine offenen Rücküberweisungen.",
     pendingRefundBankHint: "Originalbetrag der Überweisung",
     pendingRefundStripeHint: "Netto (Brutto {gross} − Gebühren {fees})",

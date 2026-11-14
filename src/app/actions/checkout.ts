@@ -64,10 +64,10 @@ import {
   allocateCreditAcrossSeats,
   finalizeCourseEnrollmentPayments,
   finalizeSubscriptionPayments,
-  getCreditBalance,
   reserveCourseCreditForBankTransfer,
   reserveSubscriptionCreditForBankTransfer,
 } from "@/lib/credit";
+import { getSectionCreditBalance } from "@/lib/section-credit";
 import { revalidateEnrollmentViews } from "@/lib/revalidate-enrollments";
 import { revalidateSubscriptionViews } from "@/lib/revalidate-subscriptions";
 import { validateBundledMembershipPlan } from "@/lib/course-bundled-plan";
@@ -110,9 +110,6 @@ export async function startCheckoutAction(
   paymentMethod: CheckoutPaymentChoice = "stripe",
   _useCredit = false,
 ): Promise<CheckoutState> {
-  // Guthaben ist nur noch für Tennisplätze nutzbar.
-  const useCredit = false;
-  void _useCredit;
   const user = await getCurrentUser();
   if (!user) {
     redirect(`/anmelden?next=/kurse/${courseId}`);
@@ -192,7 +189,9 @@ export async function startCheckoutAction(
     return { url: `/zahlung/erfolg?kostenlos=1&kurs=${course.id}` };
   }
 
-  const creditBalance = useCredit ? await getCreditBalance(user.id) : 0;
+  const sectionCredit = await getSectionCreditBalance(user.id, course.sectionId);
+  const useCredit = Boolean(_useCredit) && sectionCredit > 0;
+  const creditBalance = useCredit ? sectionCredit : 0;
   const allocations = allocateCreditAcrossItems(
     pricedEnrollments.map((item) => ({
       itemId: item.enrollment.id,
@@ -248,7 +247,12 @@ export async function startCheckoutAction(
       },
     });
     if (totalCreditCents > 0) {
-      await reserveCourseCreditForBankTransfer(user.id, allocations, course.title);
+      await reserveCourseCreditForBankTransfer(
+        user.id,
+        allocations,
+        course.title,
+        course.sectionId,
+      );
     }
     revalidateEnrollmentViews(course.id);
     return {
@@ -356,8 +360,6 @@ export async function startWaitlistOfferCheckoutAction(
   paymentMethod: CheckoutPaymentChoice = "stripe",
   _useCredit = false,
 ): Promise<CheckoutState> {
-  const useCredit = false;
-  void _useCredit;
   const user = await getCurrentUser();
   if (!user) {
     redirect(`/anmelden?next=/kurse/${courseId}/platz-sichern?enrollment=${enrollmentId}&token=${token}`);
@@ -404,7 +406,12 @@ export async function startWaitlistOfferCheckoutAction(
     return { url: `/zahlung/erfolg?kostenlos=1&kurs=${courseId}` };
   }
 
-  const creditBalance = useCredit ? await getCreditBalance(user.id) : 0;
+  const sectionCredit = await getSectionCreditBalance(
+    user.id,
+    enrollment.course.sectionId,
+  );
+  const useCredit = Boolean(_useCredit) && sectionCredit > 0;
+  const creditBalance = useCredit ? sectionCredit : 0;
   const allocations = allocateCreditAcrossSeats([enrollment.id], priceCents, creditBalance);
   const allocation = allocations[0];
   const cardCents = allocation?.cardCents ?? priceCents;
@@ -453,6 +460,7 @@ export async function startWaitlistOfferCheckoutAction(
         user.id,
         [{ enrollmentId: enrollment.id, priceCents, creditCents, cardCents }],
         enrollment.course.title,
+        enrollment.course.sectionId,
       );
     }
     revalidateEnrollmentViews(courseId);
@@ -643,8 +651,6 @@ export async function startSubscriptionCheckoutAction(
   paymentMethod: CheckoutPaymentChoice = "stripe",
   _useCredit = false,
 ): Promise<CheckoutState> {
-  const useCredit = false;
-  void _useCredit;
   const { t } = await getActionI18n();
   const user = await getCurrentUser();
   if (!user) {
@@ -666,6 +672,8 @@ export async function startSubscriptionCheckoutAction(
   const isBundle = isFamilyBundlePlan(plan);
   const meta = intervalMeta(plan.interval, t);
   const wantsRenew = autoRenew && plan.autoRenewOffered && Boolean(meta.stripe);
+  const sectionCredit = await getSectionCreditBalance(user.id, plan.sectionId);
+  const useCredit = Boolean(_useCredit) && sectionCredit > 0;
   if (useCredit && wantsRenew) {
     return { error: "Guthaben ist bei automatischer Verlängerung nicht verfügbar." };
   }
@@ -750,7 +758,7 @@ export async function startSubscriptionCheckoutAction(
     ? familyQuote?.totalCents ?? 0
     : priced.reduce((sum, item) => sum + item.quote.cents, 0);
 
-  const creditBalance = useCredit ? await getCreditBalance(user.id) : 0;
+  const creditBalance = useCredit ? sectionCredit : 0;
   const allocations = allocateCreditAcrossItems(
     priced.map((item) => ({
       itemId: item.subscription.id,
@@ -828,6 +836,7 @@ export async function startSubscriptionCheckoutAction(
         user.id,
         allocations,
         plan.title,
+        plan.sectionId,
       );
     }
     revalidateSubscriptionViews(plan.id);

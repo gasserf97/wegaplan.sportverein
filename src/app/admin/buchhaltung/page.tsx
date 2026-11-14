@@ -1054,7 +1054,9 @@ function PendingRefundTable({
                     ? t("accounting.kindCourse")
                     : row.kind === "device"
                       ? t("accounting.kindDevice")
-                      : t("accounting.kindAddon");
+                      : row.kind === "court"
+                        ? t("accounting.kindCourt")
+                        : t("accounting.kindAddon");
                 const amountTitle =
                   row.paymentMethod === "STRIPE"
                     ? t("accounting.pendingRefundStripeHint", {

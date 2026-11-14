@@ -14,6 +14,7 @@ export type CreditAccountRow = {
   name: string;
   email: string;
   username: string;
+  sectionName: string | null;
   creditBalanceCents: number;
   transactions: CreditTransactionRow[];
 };

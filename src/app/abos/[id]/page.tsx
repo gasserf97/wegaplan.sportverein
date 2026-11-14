@@ -25,7 +25,7 @@ import { prisma } from "@/lib/prisma";
 import { currentlyValidSubscriptionFilter, intervalMeta, isPlanPubliclyVisible } from "@/lib/subscriptions";
 import { processDueAutoRenewals } from "@/lib/subscription-renewal";
 import { isSectionBankConfigured, isSectionStripeConfigured } from "@/lib/section-payments";
-import { getCreditBalance } from "@/lib/credit";
+import { getSectionCreditBalance } from "@/lib/section-credit";
 import { SubscriptionCheckoutCleanup } from "@/components/court-checkout-cleanup";
 import { audienceMismatchReason, formatCourseAudience } from "@/lib/courses";
 import { getServerI18n } from "@/lib/i18n";
@@ -160,7 +160,9 @@ export default async function SubscriptionDetailPage({
   const selfHasMembership =
     user?.role === "ADMIN" ||
     (user ? await hasActiveClubMembership(user.id) : false);
-  const creditBalanceCents = user ? await getCreditBalance(user.id) : 0;
+  const creditBalanceCents = user
+    ? await getSectionCreditBalance(user.id, plan.sectionId)
+    : 0;
 
   const membershipNoticesOn = shouldShowMembershipNotices();
   const membershipHint =

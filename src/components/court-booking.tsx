@@ -90,6 +90,7 @@ type Court = {
   category: string;
   blocked: boolean;
   priceCentsPerHour: number;
+  sectionId?: string | null;
 };
 
 type ReservationCell = {
@@ -113,6 +114,7 @@ type PendingSlot = {
   courtId: string;
   courtName: string;
   courtPriceCentsPerHour: number;
+  sectionId: string | null;
   startsAt: string;
 };
 
@@ -126,6 +128,7 @@ export function CourtBookingCalendar({
   maxDurationHours,
   hasSeasonCard,
   creditBalanceCents = 0,
+  sectionCreditCents = {},
   bookerName,
   offerCalendarSync = false,
 }: {
@@ -138,6 +141,8 @@ export function CourtBookingCalendar({
   maxDurationHours: number;
   hasSeasonCard: boolean;
   creditBalanceCents?: number;
+  /** Zusätzliches Guthaben je Sektion (Platz-Sektion). */
+  sectionCreditCents?: Record<string, number>;
   bookerName: string | null;
   /** Nach kostenloser Buchung Kalender-Sync anbieten. */
   offerCalendarSync?: boolean;
@@ -251,9 +256,12 @@ export function CourtBookingCalendar({
     );
   }, [pending, durationMinutes, isLoggedIn, hasSeasonCard]);
 
+  const availableCreditCents =
+    creditBalanceCents +
+    (pending?.sectionId ? (sectionCreditCents[pending.sectionId] ?? 0) : 0);
   const creditApplied =
     isLoggedIn && useCredit && estimatedPriceCents > 0
-      ? Math.min(creditBalanceCents, estimatedPriceCents)
+      ? Math.min(availableCreditCents, estimatedPriceCents)
       : 0;
   const amountDue = Math.max(0, estimatedPriceCents - creditApplied);
 
@@ -268,10 +276,17 @@ export function CourtBookingCalendar({
     const cap = Math.min(available, maxDurationHours * 60);
     setDurationMinutes(Math.min(60, cap) >= BOOKING.slotMinutes ? Math.min(60, cap) : cap);
     setError(null);
+    if (
+      creditBalanceCents > 0 ||
+      (court.sectionId && (sectionCreditCents[court.sectionId] ?? 0) > 0)
+    ) {
+      setUseCredit(true);
+    }
     setPending({
       courtId: court.id,
       courtName: court.name,
       courtPriceCentsPerHour: court.priceCentsPerHour,
+      sectionId: court.sectionId ?? null,
       startsAt: startsAt.toISOString(),
     });
   }
@@ -694,6 +709,12 @@ export function CourtBookingCalendar({
                   amount: formatEuro(result.cardRefundCreditedCents),
                 }),
               );
+            } else if (result && "ok" in result && result.pendingRefundCents) {
+              window.alert(
+                t("tennis.cancelCardPending", {
+                  amount: formatEuro(result.pendingRefundCents),
+                }),
+              );
             }
             setManage(null);
             router.refresh();
@@ -1085,7 +1106,7 @@ function BookingFormFields({
           )}
         </p>
 
-        {isLoggedIn && estimatedPriceCents > 0 && creditBalanceCents > 0 ? (
+        {isLoggedIn && estimatedPriceCents > 0 && availableCreditCents > 0 ? (
           <label className="flex items-start gap-2 text-sm">
             <input
               type="checkbox"
@@ -1094,7 +1115,7 @@ function BookingFormFields({
               className="mt-1 size-4 accent-primary"
             />
             <span>
-              Guthaben für Tennisplätze verwenden ({formatEuro(creditBalanceCents)}{" "}
+              Guthaben verwenden ({formatEuro(availableCreditCents)}{" "}
               verfügbar)
             </span>
           </label>
@@ -1167,6 +1188,12 @@ export function MyReservationsList({
         window.alert(
           t("tennis.cancelCardFallback", {
             amount: formatEuro(result.cardRefundCreditedCents),
+          }),
+        );
+      } else if (result && "ok" in result && result.pendingRefundCents) {
+        window.alert(
+          t("tennis.cancelCardPending", {
+            amount: formatEuro(result.pendingRefundCents),
           }),
         );
       }

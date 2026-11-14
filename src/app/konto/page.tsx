@@ -21,6 +21,7 @@ import { ResendCourseConfirmationButton } from "@/components/resend-course-confi
 import { ResendMembershipCardButton } from "@/components/resend-membership-card-button";
 import { Badge } from "@/components/ui/badge";
 import { getAccountTransactions } from "@/lib/account-transactions";
+import { listSectionCreditBalances } from "@/lib/section-credit";
 import {
   accountingAmountCents,
   enrollmentCreditRefundCents,
@@ -609,6 +610,13 @@ export default async function AccountPage() {
       <CreditBalanceSection
         balanceCents={profile.creditBalanceCents}
         transactions={ledger}
+        sectionBalances={(await listSectionCreditBalances(user.id)).map(
+          (row) => ({
+            sectionId: row.sectionId,
+            name: row.section.name,
+            balanceCents: row.balanceCents,
+          }),
+        )}
       />
 
       <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-x-4 sm:gap-y-1">

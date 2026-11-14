@@ -218,6 +218,27 @@ export async function moveSectionAction(
   return { ok: true };
 }
 
+export async function updateSectionCreditAllowedAction(
+  sectionId: string,
+  creditAllowed: boolean,
+): Promise<ActionState> {
+  const admin = await requireAdmin();
+  if (!admin) return { error: "Nur Haupt-Administratoren." };
+
+  const section = await prisma.section.findUnique({
+    where: { id: sectionId },
+    select: { id: true },
+  });
+  if (!section) return { error: "Sektion nicht gefunden." };
+
+  await prisma.section.update({
+    where: { id: sectionId },
+    data: { creditAllowed },
+  });
+  revalidateSectionPaths();
+  return { ok: true };
+}
+
 export async function updateSectionPaymentEnvKeyAction(
   _prev: SectionPaymentEnvState,
   formData: FormData,

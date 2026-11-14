@@ -71,7 +71,11 @@ export function CancelEnrollmentButton({
             }
             if (result.cardRefundCreditedCents > 0) {
               window.alert(
-                `Die Rückerstattung auf die Karte ist fehlgeschlagen. ${formatEuro(result.cardRefundCreditedCents)} wurden Ihrem Guthaben gutgeschrieben.`,
+                `Die Rückerstattung auf die Karte ist fehlgeschlagen. ${formatEuro(result.cardRefundCreditedCents)} wurden dem Guthaben dieser Sektion gutgeschrieben.`,
+              );
+            } else if (result.pendingRefundCents > 0) {
+              window.alert(
+                `Die Rückerstattung auf die Karte ist fehlgeschlagen. ${formatEuro(result.pendingRefundCents)} stehen unter „Zurückzuweisende Überweisungen“.`,
               );
             }
             setDone(true);

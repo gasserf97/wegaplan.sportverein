@@ -84,6 +84,24 @@ export default async function TennisCourtPage({
     }),
   ]);
 
+  const sectionIds = courts
+    .map((court) => court.sectionId)
+    .filter((id): id is string => Boolean(id));
+  const sectionCreditRows =
+    user && sectionIds.length > 0
+      ? await prisma.sectionCreditAccount.findMany({
+          where: {
+            userId: user.id,
+            sectionId: { in: sectionIds },
+            balanceCents: { gt: 0 },
+          },
+          select: { sectionId: true, balanceCents: true },
+        })
+      : [];
+  const sectionCreditCents = Object.fromEntries(
+    sectionCreditRows.map((row) => [row.sectionId, row.balanceCents]),
+  );
+
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-4 sm:px-6 sm:py-6">
       <CourtCheckoutCleanup />
@@ -100,6 +118,7 @@ export default async function TennisCourtPage({
         canManageBlocks={longSlots}
         hasSeasonCard={hasSeasonCard}
         creditBalanceCents={creditBalanceCents}
+        sectionCreditCents={sectionCreditCents}
         bookerName={user?.name ?? null}
         offerCalendarSync={offerCalendarSync}
         maxDurationHours={

@@ -9,9 +9,10 @@ import {
 } from "@/lib/courses";
 import {
   addCreditBalance,
-  addCreditRefundOnce,
   creditRefundAmount,
+  restoreSpentCredit,
 } from "@/lib/credit";
+import { settleFailedCardRefund } from "@/lib/failed-refund";
 import {
   cashRefundPayoutCents,
   createPendingRefundTransfer,
@@ -36,7 +37,12 @@ export async function cancelEnrollmentAction(
   enrollmentId: string,
 ): Promise<
   | { error: string }
-  | { ok: true; creditedCents: number; cardRefundCreditedCents: number }
+  | {
+      ok: true;
+      creditedCents: number;
+      cardRefundCreditedCents: number;
+      pendingRefundCents: number;
+    }
 > {
   const user = await getCurrentUser();
   if (!user) return { error: "Bitte melden Sie sich an." };
@@ -92,6 +98,7 @@ export async function cancelEnrollmentAction(
   const creditRecipientId = enrollment.purchasedById ?? enrollment.userId;
   let creditedCents = 0;
   let cardRefundCreditedCents = 0;
+  let pendingRefundCents = 0;
   let cardRefunded = false;
   const wasPaid = enrollment.status === "PAID";
   const paidByCard =
@@ -149,17 +156,30 @@ export async function cancelEnrollmentAction(
           externalCents,
           payout.payoutCents,
         );
-        const added = await addCreditRefundOnce(creditRecipientId, refundCents, {
-          description: `Stornierung (Kartenerstattung fehlgeschlagen): ${enrollment.course.title}`,
+        const settled = await settleFailedCardRefund({
+          sectionId: enrollment.course.sectionId,
+          userId: creditRecipientId,
+          creditCents: refundCents,
+          creditDescription: `Stornierung (Kartenerstattung fehlgeschlagen): ${enrollment.course.title}`,
           enrollmentId: enrollment.id,
+          pending: {
+            kind: "COURSE",
+            title: enrollment.course.title,
+            memberName: enrollment.user.name,
+            payerName: enrollment.purchasedBy?.name ?? null,
+            externalCents,
+            stripeFeeCents: feeCents,
+            stripeSessionId: enrollment.stripeSessionId,
+          },
         });
-        cardRefundCreditedCents += added;
-        creditedCents += added;
+        cardRefundCreditedCents += settled.creditedCents;
+        creditedCents += settled.creditedCents;
+        pendingRefundCents += settled.pendingRefundCents;
       }
     }
 
     if (enrollment.creditAppliedCents > 0) {
-      const added = await addCreditRefundOnce(
+      const added = await restoreSpentCredit(
         creditRecipientId,
         enrollment.creditAppliedCents,
         {
@@ -252,5 +272,5 @@ export async function cancelEnrollmentAction(
   revalidatePath("/admin");
   revalidatePath("/admin/buchhaltung");
 
-  return { ok: true, creditedCents, cardRefundCreditedCents };
+  return { ok: true, creditedCents, cardRefundCreditedCents, pendingRefundCents };
 }

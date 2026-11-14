@@ -44,6 +44,7 @@ enum PendingRefundKind {
   COURSE
   DEVICE
   SUBSCRIPTION
+  COURT
 }
 
 model User {
@@ -104,6 +105,7 @@ model User {
   managedBy             User?              @relation("FamilyDependents", fields: [managedById], references: [id], onDelete: Cascade)
   dependents            User[]             @relation("FamilyDependents")
   creditTransactions    CreditTransaction[]
+  sectionCreditAccounts SectionCreditAccount[]
   supportTickets        SupportTicket[]    @relation("TicketCreator")
   closedSupportTickets  SupportTicket[]    @relation("TicketClosedBy")
   pendingRefundTransfers PendingRefundTransfer[] @relation("RefundRecipient")
@@ -157,10 +159,14 @@ model CreditTransaction {
   subscriptionId String?
   courtReservationId String?
   deviceReservationId String?
+  /// Gesetzt, wenn die Buchung das Guthabenkonto einer Sektion betrifft.
+  sectionId    String?
   createdAt    DateTime              @default(now())
   user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  section      Section?              @relation(fields: [sectionId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
+  @@index([sectionId])
   @@index([subscriptionId])
   @@index([courtReservationId])
   @@index([deviceReservationId])
@@ -173,6 +179,8 @@ model Section {
   sortOrder          Int            @default(0)
   /// Kartenfarbe aller Kurse dieser Sektion.
   accent             String         @default("red")
+  /// Fehlgeschlagene Kartenerstattung: true = Sektionsguthaben, false = Zurückzuweisende Überweisungen.
+  creditAllowed      Boolean        @default(false)
   createdAt          DateTime       @default(now())
   members            UserSection[]
   admins             SectionAdmin[]
@@ -181,8 +189,23 @@ model Section {
   courts             Court[]
   devices            Device[]
   clubEvents         ClubEventSection[]
+  creditAccounts     SectionCreditAccount[]
+  creditTransactions CreditTransaction[]
 
   @@index([sortOrder])
+}
+
+/// Guthaben eines Mitglieds, das nur für Buchungen dieser Sektion gilt.
+model SectionCreditAccount {
+  id           String  @id @default(cuid())
+  userId       String
+  sectionId    String
+  balanceCents Int     @default(0)
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  section      Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sectionId])
+  @@index([sectionId])
 }
 
 model UserSection {
@@ -569,11 +592,11 @@ model HostingMetricPeak {
 }
 
 /**
- * Rücküberweisung nach Storno (Kurs/Fuhrpark/Abo).
- * Zwischenzeitlich Guthaben auf dem Konto; auszahlbar erst nach Bestätigung
- * (Überweisung: Originalbetrag, Stripe: Netto nach Gebühren).
- * Tennisplatz-Stornos landen hier nicht: der Kartenbetrag geht abzüglich
- * Stripe-Gebühr direkt über Stripe zurück.
+ * Rücküberweisung nach Storno (Kurs/Fuhrpark/Abo) oder nach fehlgeschlagener
+ * Kartenerstattung, wenn die Sektion kein Guthaben erlaubt.
+ * Bei Überweisungs-Stornos liegt der Betrag zwischenzeitlich als Guthaben
+ * und wird bei Bestätigung wieder abgezogen. Fehlgeschlagene Kartenerstattungen
+ * ohne Guthaben haben creditedCents = 0: nur die Rücküberweisung steht offen.
  */
 model PendingRefundTransfer {
   id                  String              @id @default(cuid())
@@ -583,6 +606,7 @@ model PendingRefundTransfer {
   enrollmentId        String?
   deviceReservationId String?
   subscriptionId      String?
+  courtReservationId  String?
   paymentMethod       PaymentMethod?
   /// Ursprünglich eingegangener Betrag (ohne Guthabenanteil).
   externalCents       Int
@@ -606,6 +630,7 @@ model PendingRefundTransfer {
   @@index([enrollmentId])
   @@index([deviceReservationId])
   @@index([subscriptionId])
+  @@index([courtReservationId])
   @@index([sectionId])
 }
 
