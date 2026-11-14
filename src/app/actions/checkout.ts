@@ -260,9 +260,10 @@ export async function startCheckoutAction(
     return { error: stripeCheckoutUnavailableError };
   }
 
+  const enrollmentIds = enrollments.map((item) => item.id);
   const showcase = await startShowcaseCheckout(async (sessionId) => {
     await prisma.enrollment.updateMany({
-      where: { id: { in: enrollments.map((item) => item.id) } },
+      where: { id: { in: enrollmentIds } },
       data: { stripeSessionId: sessionId, paymentMethod: "STRIPE" },
     });
   });
@@ -963,10 +964,11 @@ export async function startSubscriptionCheckoutAction(
       return { error: "Keine zahlungspflichtigen Positionen." };
     }
 
+    const pricedIds = priced.map((item) => item.subscription.id);
     const showcasePlan = await startShowcaseCheckout(async (sessionId) => {
-      for (const item of priced) {
+      for (const id of pricedIds) {
         await prisma.subscription.update({
-          where: { id: item.subscription.id },
+          where: { id },
           data: { stripeSessionId: sessionId, paymentMethod: "STRIPE" },
         });
       }
