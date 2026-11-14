@@ -77,6 +77,7 @@ import {
   type CheckoutPaymentChoice,
 } from "@/lib/bank-transfer";
 import { validateWaitlistOfferAccess } from "@/app/actions/waitlist";
+import { startShowcaseCheckout } from "@/lib/stripe-demo";
 import { clearWaitlistOfferData } from "@/lib/waitlist";
 
 export type CheckoutState = { error: string } | { url: string } | null;
@@ -257,6 +258,17 @@ export async function startCheckoutAction(
 
   if (!(await isSectionStripeConfigured(course.sectionId))) {
     return { error: stripeCheckoutUnavailableError };
+  }
+
+  const showcase = await startShowcaseCheckout(async (sessionId) => {
+    await prisma.enrollment.updateMany({
+      where: { id: { in: enrollments.map((item) => item.id) } },
+      data: { stripeSessionId: sessionId, paymentMethod: "STRIPE" },
+    });
+  });
+  if (showcase) {
+    revalidateEnrollmentViews(course.id);
+    return showcase;
   }
 
   try {
@@ -450,6 +462,17 @@ export async function startWaitlistOfferCheckoutAction(
 
   if (!(await isSectionStripeConfigured(enrollment.course.sectionId))) {
     return { error: stripeCheckoutUnavailableError };
+  }
+
+  const showcaseOffer = await startShowcaseCheckout(async (sessionId) => {
+    await prisma.enrollment.update({
+      where: { id: enrollment.id },
+      data: { stripeSessionId: sessionId, paymentMethod: "STRIPE" },
+    });
+  });
+  if (showcaseOffer) {
+    revalidateEnrollmentViews(courseId);
+    return showcaseOffer;
   }
 
   try {
@@ -938,6 +961,19 @@ export async function startSubscriptionCheckoutAction(
 
     if (lineItems.length === 0) {
       return { error: "Keine zahlungspflichtigen Positionen." };
+    }
+
+    const showcasePlan = await startShowcaseCheckout(async (sessionId) => {
+      for (const item of priced) {
+        await prisma.subscription.update({
+          where: { id: item.subscription.id },
+          data: { stripeSessionId: sessionId, paymentMethod: "STRIPE" },
+        });
+      }
+    });
+    if (showcasePlan) {
+      revalidateSubscriptionViews(plan.id);
+      return showcasePlan;
     }
 
     const savePaymentForRenewal =

@@ -6,6 +6,7 @@ import {
   getGlobalStripeSecretKey,
   getGlobalStripeWebhookSecret,
   getPublicAppUrl,
+  isStripeDemoMode,
 } from "@/lib/stripe";
 
 export type SectionBankDetails = {
@@ -189,6 +190,13 @@ export async function getSectionStripeStatus(
 export async function isSectionStripeConfigured(
   sectionId: string | null | undefined,
 ) {
+  if (isStripeDemoMode()) return true;
+  if (
+    cleanStripeEnv(process.env.SHOWCASE_MODE) === "1" &&
+    getGlobalStripeSecretKey()
+  ) {
+    return true;
+  }
   const status = await getSectionStripeStatus(sectionId);
   return status.checkoutReady;
 }

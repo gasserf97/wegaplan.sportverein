@@ -283,6 +283,17 @@ export const it = {
     subscriptionsHint:
       "Tesseramento club e tessere stagionali. Prima il tesseramento, poi gli abbonamenti aggiuntivi.",
     noSubscriptions: "Al momento non ci sono abbonamenti pubblicati.",
+    demoHeading: "Accessi di esempio",
+    demoIntro:
+      "Dimostrazione con persone inventate. Per entrare usate nome utente e password.",
+    demoAdmin: "Amministratore",
+    demoMember: "Socio con famiglia",
+    demoTennis: "Admin sezione tennis",
+    demoFootball: "Admin sezione calcio",
+    demoFootballMember: "Socia calcio",
+    demoCard:
+      "Il pagamento con carta è in modalità test di Stripe. Carta di prova 4242 4242 4242 4242, scadenza 12/34, CVC 123. Nessun addebito reale.",
+    demoLogin: "Vai all’accesso",
   },
   courses: {
     title: "Corsi",
@@ -787,6 +798,17 @@ export const it = {
   },
   payment: {
     successTitle: "Pagamento confermato",
+    stripeTestTitle: "Pagamento di prova Stripe",
+    stripeTestEyebrow: "Modalità test Stripe",
+    stripeTestIntro:
+      "Dimostrazione: il pagamento si chiude come con un conto di prova Stripe. La carta 4242 … è la carta di test ufficiale, senza addebito reale.",
+    stripeTestCard: "Numero carta",
+    stripeTestExpiry: "Scadenza",
+    stripeTestCvc: "CVC",
+    stripeTestHint: "Altri numeri di carta vengono rifiutati.",
+    stripeTestCardError: "È accettata solo la carta di prova Stripe 4242 4242 4242 4242.",
+    stripeTestPay: "Paga {amount} in prova",
+    stripeTestCancel: "Annulla",
     successAbo: "Il vostro abbonamento «{title}» è stato salvato.",
     successCourt: "La vostra prenotazione per «{title}» è confermata.",
     successDevice: "La vostra prenotazione auto per «{title}» è confermata.",

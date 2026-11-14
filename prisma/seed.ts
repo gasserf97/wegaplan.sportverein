@@ -1,21 +1,30 @@
 import { hash } from "bcryptjs";
 import { prisma } from "../src/lib/prisma";
 
+function daysFromNow(offsetDays: number, hourUtc = 17) {
+  const date = new Date();
+  date.setUTCHours(hourUtc, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  return date;
+}
+
 async function main() {
   const adminHash = await hash("Admin1234", 10);
   const userHash = await hash("User1234", 10);
   const tennisHash = await hash("Tennis1234", 10);
+  const footballHash = await hash("Fussball1", 10);
+  const annaHash = await hash("Anna1234", 10);
 
   const admin = await prisma.user.upsert({
     where: { username: "admin" },
     update: {
       passwordHash: adminHash,
       role: "ADMIN",
-      name: "Michael Prader",
-      email: "admin@asclajen.com",
-      phone: "+393471000001",
-      taxId: "PRDMHL85C15H620A",
-      street: "Kesselweg 8/B",
+      name: "Klara Leitner",
+      email: "klara.leitner@example.com",
+      phone: "+393470000001",
+      taxId: "LTNKLR80A01H620X",
+      street: "Musterweg 1",
       postalCode: "39040",
       city: "Lajen",
       birthDate: new Date("1985-03-15T12:00:00.000Z"),
@@ -23,11 +32,11 @@ async function main() {
     },
     create: {
       username: "admin",
-      name: "Michael Prader",
-      email: "admin@asclajen.com",
-      phone: "+393471000001",
-      taxId: "PRDMHL85C15H620A",
-      street: "Kesselweg 8/B",
+      name: "Klara Leitner",
+      email: "klara.leitner@example.com",
+      phone: "+393470000001",
+      taxId: "LTNKLR80A01H620X",
+      street: "Musterweg 1",
       postalCode: "39040",
       city: "Lajen",
       birthDate: new Date("1985-03-15T12:00:00.000Z"),
@@ -85,11 +94,11 @@ async function main() {
     where: { username: "tennis" },
     update: {
       passwordHash: tennisHash,
-      name: "Tennis Sektion",
-      email: "tennis@asclajen.com",
-      phone: "+393471000003",
-      taxId: "TNNSEC92S08H620C",
-      street: "Tennisweg 1",
+      name: "Lena Gruber",
+      email: "lena.gruber@example.com",
+      phone: "+393470000003",
+      taxId: "GRBLNE92S41H620Y",
+      street: "Platzweg 4",
       postalCode: "39040",
       city: "Lajen",
       birthDate: new Date("1992-11-08T12:00:00.000Z"),
@@ -97,11 +106,11 @@ async function main() {
     },
     create: {
       username: "tennis",
-      name: "Tennis Sektion",
-      email: "tennis@asclajen.com",
-      phone: "+393471000003",
-      taxId: "TNNSEC92S08H620C",
-      street: "Tennisweg 1",
+      name: "Lena Gruber",
+      email: "lena.gruber@example.com",
+      phone: "+393470000003",
+      taxId: "GRBLNE92S41H620Y",
+      street: "Platzweg 4",
       postalCode: "39040",
       city: "Lajen",
       birthDate: new Date("1992-11-08T12:00:00.000Z"),
@@ -197,27 +206,33 @@ async function main() {
       id: "kurs-yoga",
       title: "Somatic Yoga",
       description:
-        "Sanfte Bewegung, bewusste Atmung und praktische Übungen für mehr Ruhe und Wohlbefinden. Geeignet für alle – ohne Leistungsdruck. Turnhalle Lajen.",
-      priceCents: 10000,
+        "Beispielkurs: sanfte Bewegung und Atmung in der Turnhalle. Mittwochs, ohne Leistungsdruck, für alle Mitglieder.",
+      priceCents: 9000,
       location: "Turnhalle Lajen",
-      startsAt: new Date("2026-09-28T17:30:00.000Z"),
-      endsAt: new Date("2026-12-07T17:30:00.000Z"),
-      registrationDeadline: new Date("2026-09-20T12:00:00.000Z"),
-      maxParticipants: 25,
+      startsAt: daysFromNow(21, 17),
+      endsAt: daysFromNow(90, 17),
+      registrationDeadline: daysFromNow(14, 12),
+      scheduleWeekdays: [3],
+      scheduleStartMinute: 18 * 60,
+      scheduleEndMinute: 19 * 60,
+      maxParticipants: 16,
       accent: "teal",
       sectionId: freizeitSection.id,
       createdById: admin.id,
     },
     {
       id: "kurs-kondition-damen",
-      title: "Konditionsgymnastik für Damen",
+      title: "Konditionsgymnastik",
       description:
-        "Trainiert werden Ausdauer, Kraft, Bauch, Beine und Po. Referent: Reinhold Rogen. Mittwochs in der Turnhalle Lajen – ideal für Mitglieder der Sektion Freizeit Aktiv.",
-      priceCents: 10000,
+        "Beispielkurs der Sektion Freizeit Aktiv: Ausdauer und Kraft, dienstags in der Turnhalle. Ab 18 Jahren.",
+      priceCents: 8000,
       location: "Turnhalle Lajen",
-      startsAt: new Date("2026-10-07T17:15:00.000Z"),
-      endsAt: new Date("2026-12-16T17:15:00.000Z"),
-      registrationDeadline: new Date("2026-09-30T12:00:00.000Z"),
+      startsAt: daysFromNow(16, 17),
+      endsAt: daysFromNow(100, 17),
+      registrationDeadline: daysFromNow(12, 12),
+      scheduleWeekdays: [2],
+      scheduleStartMinute: 19 * 60,
+      scheduleEndMinute: 20 * 60,
       audienceMinAge: 18,
       maxParticipants: 20,
       accent: "red",
@@ -226,33 +241,40 @@ async function main() {
     },
     {
       id: "kurs-fussball",
-      title: "Fußballschule 2026/2027",
+      title: "Fußball für Kinder",
       description:
-        "Fußballschule für Jahrgänge 2020/21/22. Nur Training, keine Meisterschaftsspiele. Spielerisch Technik und Teamgeist fördern – Sektion Fußball ASC Lajen.",
-      priceCents: 10000,
+        "Beispielkurs der Sektion Fußball: spielerisches Training für Kinder von 6 bis 12 Jahren. Samstags am Sportplatz, ohne Meisterschaft.",
+      priceCents: 7000,
       location: "Sportplatz Lajen",
-      startsAt: new Date("2026-04-16T08:00:00.000Z"),
-      endsAt: new Date("2027-04-15T08:00:00.000Z"),
-      registrationDeadline: new Date("2026-04-01T12:00:00.000Z"),
-      audienceMaxAge: 8,
-      maxParticipants: 30,
+      startsAt: daysFromNow(10, 9),
+      endsAt: daysFromNow(160, 9),
+      registrationDeadline: daysFromNow(30, 12),
+      scheduleWeekdays: [6],
+      scheduleStartMinute: 10 * 60,
+      scheduleEndMinute: 11 * 60 + 30,
+      audienceMinAge: 6,
+      audienceMaxAge: 12,
+      maxParticipants: 18,
       accent: "navy",
       sectionId: fussballSection.id,
       createdById: admin.id,
     },
     {
       id: "kurs-dennis-sektion",
-      title: "Tennistraining",
+      title: "Tennistraining Jugend",
       description:
-        "Wöchentliches Training der Sektion Tennis. Technik, Matchpraxis und Spiel auf den Plätzen in Lajen.",
-      priceCents: 8000,
+        "Beispielkurs der Sektion Tennis: Technik und Matchpraxis für 10- bis 18-Jährige auf den Plätzen in Lajen.",
+      priceCents: 12000,
       location: "Tennisplätze Lajen",
-      startsAt: new Date("2026-05-01T17:00:00.000Z"),
-      endsAt: new Date("2026-06-26T17:00:00.000Z"),
-      registrationDeadline: new Date("2026-04-20T12:00:00.000Z"),
+      startsAt: daysFromNow(12, 16),
+      endsAt: daysFromNow(80, 16),
+      registrationDeadline: daysFromNow(20, 12),
+      scheduleWeekdays: [4],
+      scheduleStartMinute: 17 * 60,
+      scheduleEndMinute: 18 * 60 + 30,
       audienceMinAge: 10,
       audienceMaxAge: 18,
-      maxParticipants: 12,
+      maxParticipants: 8,
       accent: "green",
       sectionId: tennisSection.id,
       createdById: tennisAdmin.id,
@@ -369,6 +391,8 @@ async function main() {
           userId: max.id,
           planId: membershipPlanId,
           status: "ACTIVE",
+          paymentMethod: "STRIPE",
+          stripeSessionId: "cs_test_seed_max_member",
           paidCents,
           paidAt: periodStart,
           periodStart,
@@ -381,6 +405,8 @@ async function main() {
         where: { id: "demo-sub-max-member" },
         data: {
           status: "ACTIVE",
+          paymentMethod: "STRIPE",
+          stripeSessionId: "cs_test_seed_max_member",
           paidCents,
           paidAt: periodStart,
           periodStart,
@@ -394,29 +420,263 @@ async function main() {
     where: { userId_courseId: { userId: max.id, courseId: "kurs-yoga" } },
     update: {
       status: "PAID",
-      paidAt: new Date("2026-04-02T12:00:00.000Z"),
+      paymentMethod: "STRIPE",
+      stripeSessionId: "cs_test_seed_max_yoga",
+      paidCents: 9000,
+      stripeFeeCents: 160,
+      paidAt: daysFromNow(-20, 10),
     },
     create: {
       userId: max.id,
       courseId: "kurs-yoga",
       status: "PAID",
-      paidAt: new Date("2026-04-02T12:00:00.000Z"),
+      paymentMethod: "STRIPE",
+      stripeSessionId: "cs_test_seed_max_yoga",
+      paidCents: 9000,
+      stripeFeeCents: 160,
+      paidAt: daysFromNow(-20, 10),
+      purchasedById: max.id,
+    },
+  });
+
+  const anna = await prisma.user.upsert({
+    where: { username: "anna" },
+    update: {
+      passwordHash: annaHash,
+      role: "USER",
+      name: "Anna Holzer",
+      email: "anna.holzer@example.com",
+      phone: "+393470000004",
+      taxId: "HLZNNA95M45H620Z",
+      street: "Bergstraße 9",
+      postalCode: "39040",
+      city: "Lajen",
+      birthDate: new Date("1995-08-05T12:00:00.000Z"),
+      emailVerifiedAt: new Date(),
+    },
+    create: {
+      username: "anna",
+      name: "Anna Holzer",
+      email: "anna.holzer@example.com",
+      phone: "+393470000004",
+      taxId: "HLZNNA95M45H620Z",
+      street: "Bergstraße 9",
+      postalCode: "39040",
+      city: "Lajen",
+      birthDate: new Date("1995-08-05T12:00:00.000Z"),
+      emailVerifiedAt: new Date(),
+      passwordHash: annaHash,
+      role: "USER",
+    },
+  });
+
+  const footballAdmin = await prisma.user.upsert({
+    where: { username: "fussball" },
+    update: {
+      passwordHash: footballHash,
+      role: "USER",
+      name: "Paul Senoner",
+      email: "paul.senoner@example.com",
+      phone: "+393470000005",
+      taxId: "SNNPLA88D12H620W",
+      street: "Kirchplatz 2",
+      postalCode: "39040",
+      city: "Lajen",
+      birthDate: new Date("1988-04-12T12:00:00.000Z"),
+      emailVerifiedAt: new Date(),
+      canBookDevices: true,
+    },
+    create: {
+      username: "fussball",
+      name: "Paul Senoner",
+      email: "paul.senoner@example.com",
+      phone: "+393470000005",
+      taxId: "SNNPLA88D12H620W",
+      street: "Kirchplatz 2",
+      postalCode: "39040",
+      city: "Lajen",
+      birthDate: new Date("1988-04-12T12:00:00.000Z"),
+      emailVerifiedAt: new Date(),
+      passwordHash: footballHash,
+      role: "USER",
+      canBookDevices: true,
+    },
+  });
+
+  const mia = await prisma.user.upsert({
+    where: { username: "mia" },
+    update: {
+      name: "Mia Berger",
+      email: "mia.berger@example.com",
+      phone: "+393470000002",
+      taxId: "BRGMIA16E02H620Q",
+      street: "Dorfstraße 12",
+      postalCode: "39040",
+      city: "Lajen",
+      birthDate: new Date("2016-05-02T12:00:00.000Z"),
+      canLogin: false,
+      managedById: max.id,
+      emailVerifiedAt: new Date(),
+    },
+    create: {
+      username: "mia",
+      name: "Mia Berger",
+      email: "mia.berger@example.com",
+      phone: "+393470000002",
+      taxId: "BRGMIA16E02H620Q",
+      street: "Dorfstraße 12",
+      postalCode: "39040",
+      city: "Lajen",
+      birthDate: new Date("2016-05-02T12:00:00.000Z"),
+      emailVerifiedAt: new Date(),
+      passwordHash: userHash,
+      role: "USER",
+      canLogin: false,
+      managedById: max.id,
+    },
+  });
+
+  await prisma.userSection.upsert({
+    where: { userId_sectionId: { userId: anna.id, sectionId: fussballSection.id } },
+    create: { userId: anna.id, sectionId: fussballSection.id },
+    update: {},
+  });
+  await prisma.userSection.upsert({
+    where: { userId_sectionId: { userId: footballAdmin.id, sectionId: fussballSection.id } },
+    create: { userId: footballAdmin.id, sectionId: fussballSection.id },
+    update: {},
+  });
+  await prisma.sectionAdmin.upsert({
+    where: { userId_sectionId: { userId: footballAdmin.id, sectionId: fussballSection.id } },
+    create: { userId: footballAdmin.id, sectionId: fussballSection.id },
+    update: {},
+  });
+
+  async function ensureMembership(id: string, userId: string, payerId: string) {
+    const periodStart = daysFromNow(-40, 9);
+    const periodEnd = new Date(periodStart);
+    periodEnd.setUTCFullYear(periodEnd.getUTCFullYear() + 1);
+    await prisma.subscription.upsert({
+      where: { id },
+      update: {
+        status: "ACTIVE",
+        paymentMethod: "STRIPE",
+        stripeSessionId: `cs_test_seed_${id}`,
+        paidCents: 1200,
+        paidAt: periodStart,
+        periodStart,
+        periodEnd,
+      },
+      create: {
+        id,
+        userId,
+        planId: membershipPlanId,
+        status: "ACTIVE",
+        paymentMethod: "STRIPE",
+        stripeSessionId: `cs_test_seed_${id}`,
+        paidCents: 1200,
+        paidAt: periodStart,
+        periodStart,
+        periodEnd,
+        purchasedById: payerId,
+      },
+    });
+    const paymentId = `pi_test_seed_${id}`;
+    const existingPayment = await prisma.subscriptionPayment.findFirst({
+      where: { subscriptionId: id, stripePaymentId: paymentId },
+    });
+    if (!existingPayment) {
+      await prisma.subscriptionPayment.create({
+        data: {
+          subscriptionId: id,
+          amountCents: 1200,
+          source: "demo",
+          paidAt: periodStart,
+          stripePaymentId: paymentId,
+          stripeFeeCents: 43,
+        },
+      });
+    }
+  }
+
+  await ensureMembership("demo-sub-anna-member", anna.id, anna.id);
+  await ensureMembership("demo-sub-lena-member", tennisAdmin.id, tennisAdmin.id);
+  await ensureMembership("demo-sub-paul-member", footballAdmin.id, footballAdmin.id);
+  await ensureMembership("demo-sub-mia-member", mia.id, max.id);
+
+  const seasonStart = daysFromNow(-15, 11);
+  const seasonEnd = new Date(seasonStart);
+  seasonEnd.setUTCFullYear(seasonEnd.getUTCFullYear() + 1);
+  await prisma.subscription.upsert({
+    where: { id: "demo-sub-max-tennis" },
+    update: {
+      status: "ACTIVE",
+      paymentMethod: "STRIPE",
+      stripeSessionId: "cs_test_seed_max_tennis",
+      paidCents: 10000,
+      paidAt: seasonStart,
+      periodStart: seasonStart,
+      periodEnd: seasonEnd,
+    },
+    create: {
+      id: "demo-sub-max-tennis",
+      userId: max.id,
+      planId: "abo-tennis-saison",
+      status: "ACTIVE",
+      paymentMethod: "STRIPE",
+      stripeSessionId: "cs_test_seed_max_tennis",
+      paidCents: 10000,
+      paidAt: seasonStart,
+      periodStart: seasonStart,
+      periodEnd: seasonEnd,
       purchasedById: max.id,
     },
   });
 
   await prisma.enrollment.upsert({
-    where: { userId_courseId: { userId: max.id, courseId: "kurs-dennis-sektion" } },
+    where: { userId_courseId: { userId: mia.id, courseId: "kurs-fussball" } },
     update: {
       status: "PAID",
-      paidAt: new Date("2026-05-10T16:00:00.000Z"),
+      paymentMethod: "STRIPE",
+      stripeSessionId: "cs_test_seed_mia_fussball",
+      paidCents: 7000,
+      stripeFeeCents: 130,
+      paidAt: daysFromNow(-5, 15),
+      purchasedById: max.id,
     },
     create: {
-      userId: max.id,
-      courseId: "kurs-dennis-sektion",
+      userId: mia.id,
+      courseId: "kurs-fussball",
       status: "PAID",
-      paidAt: new Date("2026-05-10T16:00:00.000Z"),
+      paymentMethod: "STRIPE",
+      stripeSessionId: "cs_test_seed_mia_fussball",
+      paidCents: 7000,
+      stripeFeeCents: 130,
+      paidAt: daysFromNow(-5, 15),
       purchasedById: max.id,
+    },
+  });
+
+  await prisma.enrollment.upsert({
+    where: { userId_courseId: { userId: anna.id, courseId: "kurs-kondition-damen" } },
+    update: {
+      status: "PAID",
+      paymentMethod: "STRIPE",
+      stripeSessionId: "cs_test_seed_anna_gym",
+      paidCents: 8000,
+      stripeFeeCents: 145,
+      paidAt: daysFromNow(-3, 18),
+    },
+    create: {
+      userId: anna.id,
+      courseId: "kurs-kondition-damen",
+      status: "PAID",
+      paymentMethod: "STRIPE",
+      stripeSessionId: "cs_test_seed_anna_gym",
+      paidCents: 8000,
+      stripeFeeCents: 145,
+      paidAt: daysFromNow(-3, 18),
+      purchasedById: anna.id,
     },
   });
 
@@ -424,10 +684,10 @@ async function main() {
   if ((await prisma.court.count()) === 0) {
     await prisma.court.createMany({
       data: [
-        { id: "platz-1", name: "Platz 1", category: "Freiluft", sortOrder: 1, priceCentsPerHour: 1500 },
-        { id: "platz-2", name: "Platz 2", category: "Freiluft", sortOrder: 2, priceCentsPerHour: 1500 },
-        { id: "platz-3", name: "Platz 3", category: "Freiluft", sortOrder: 3, priceCentsPerHour: 1500 },
-        { id: "platz-halle", name: "Halle", category: "Halle", sortOrder: 4, priceCentsPerHour: 2000 },
+        { id: "platz-1", name: "Platz 1", category: "Freiluft", sortOrder: 1, priceCentsPerHour: 1500, sectionId: tennisSection.id },
+        { id: "platz-2", name: "Platz 2", category: "Freiluft", sortOrder: 2, priceCentsPerHour: 1500, sectionId: tennisSection.id },
+        { id: "platz-3", name: "Platz 3", category: "Freiluft", sortOrder: 3, priceCentsPerHour: 1500, sectionId: tennisSection.id },
+        { id: "platz-halle", name: "Halle", category: "Halle", sortOrder: 4, priceCentsPerHour: 2000, sectionId: tennisSection.id },
       ],
     });
   }
@@ -450,10 +710,104 @@ async function main() {
           sortOrder: 2,
           pricingMode: "HOURLY",
           priceCents: 1500,
+          sectionId: freizeitSection.id,
         },
       ],
     });
   }
+
+  await prisma.court.updateMany({
+    where: { sectionId: null },
+    data: { sectionId: tennisSection.id },
+  });
+  await prisma.device.updateMany({
+    where: { sectionId: null },
+    data: { sectionId: freizeitSection.id },
+  });
+
+  await prisma.enrollment.deleteMany({
+    where: { userId: max.id, courseId: "kurs-dennis-sektion" },
+  });
+
+  const courtStart = daysFromNow(2, 16);
+  const courtEnd = new Date(courtStart.getTime() + 60 * 60 * 1000);
+  if (await prisma.court.findUnique({ where: { id: "platz-1" } })) {
+  await prisma.courtReservation.upsert({
+    where: { id: "demo-res-max-court" },
+    update: {
+      startsAt: courtStart,
+      endsAt: courtEnd,
+      status: "CONFIRMED",
+      paidAt: daysFromNow(-1, 12),
+      priceCents: 1500,
+      stripeFeeCents: 48,
+      stripeSessionId: "cs_test_seed_max_court",
+    },
+    create: {
+      id: "demo-res-max-court",
+      courtId: "platz-1",
+      userId: max.id,
+      label: "Training Max Berger",
+      startsAt: courtStart,
+      endsAt: courtEnd,
+      status: "CONFIRMED",
+      paidAt: daysFromNow(-1, 12),
+      priceCents: 1500,
+      stripeFeeCents: 48,
+      stripeSessionId: "cs_test_seed_max_court",
+    },
+  });
+  }
+
+  const driveStart = daysFromNow(5, 8);
+  const driveEnd = daysFromNow(5, 18);
+  if (await prisma.device.findUnique({ where: { id: "auto-2" } })) {
+  await prisma.deviceReservation.upsert({
+    where: { id: "demo-res-paul-auto" },
+    update: {
+      startsAt: driveStart,
+      endsAt: driveEnd,
+      status: "CONFIRMED",
+      paidAt: daysFromNow(-2, 9),
+      priceCents: 1500,
+      stripeFeeCents: 48,
+      stripeSessionId: "cs_test_seed_paul_auto",
+      reason: "Materialtransport zum Sportplatz",
+    },
+    create: {
+      id: "demo-res-paul-auto",
+      deviceId: "auto-2",
+      userId: footballAdmin.id,
+      startsAt: driveStart,
+      endsAt: driveEnd,
+      billingMode: "HOURLY",
+      reason: "Materialtransport zum Sportplatz",
+      status: "CONFIRMED",
+      paidAt: daysFromNow(-2, 9),
+      priceCents: 1500,
+      stripeFeeCents: 48,
+      stripeSessionId: "cs_test_seed_paul_auto",
+    },
+  });
+  }
+
+  await prisma.clubEvent.upsert({
+    where: { id: "demo-event-abend" },
+    update: {
+      body: "Beispiel: Vereinsabend in der Turnhalle. Alle Mitglieder sind eingeladen, Anmeldung ist nicht nötig.",
+      startsAt: daysFromNow(-1, 0),
+      endsAt: daysFromNow(21, 22),
+      audienceAll: true,
+    },
+    create: {
+      id: "demo-event-abend",
+      body: "Beispiel: Vereinsabend in der Turnhalle. Alle Mitglieder sind eingeladen, Anmeldung ist nicht nötig.",
+      startsAt: daysFromNow(-1, 0),
+      endsAt: daysFromNow(21, 22),
+      audienceAll: true,
+      createdById: admin.id,
+    },
+  });
 }
 
 main()

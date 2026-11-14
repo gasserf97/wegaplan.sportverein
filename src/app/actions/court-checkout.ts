@@ -21,6 +21,7 @@ import {
   stripeCheckoutUnavailableError,
 } from "@/lib/stripe";
 import { isSectionStripeConfigured } from "@/lib/section-payments";
+import { startShowcaseCheckout } from "@/lib/stripe-demo";
 import { formatSlotDate, formatSlotTime } from "@/lib/booking";
 
 export async function expireStalePendingCourtReservations() {
@@ -80,6 +81,17 @@ export async function beginCourtReservationCheckout(reservationId: string) {
 
   if (!(await isSectionStripeConfigured(reservation.court.sectionId))) {
     return { error: stripeCheckoutUnavailableError };
+  }
+
+  const showcase = await startShowcaseCheckout(async (sessionId) => {
+    await prisma.courtReservation.update({
+      where: { id: reservation.id },
+      data: { stripeSessionId: sessionId },
+    });
+  });
+  if (showcase) {
+    revalidateCourtBookingPaths();
+    return showcase;
   }
 
   try {

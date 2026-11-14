@@ -9,6 +9,7 @@ import { courseHasCalendarSchedule } from "@/lib/course-schedule";
 import { getServerI18n } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 import { listAllStripeSecretKeys } from "@/lib/section-payments";
+import { isShowcaseSessionId, loadShowcaseCheckout } from "@/lib/stripe-demo";
 import { isTennisSeasonAddonPlan } from "@/lib/tennis-whatsapp";
 import { tennisWhatsAppInviteDismissed } from "@/lib/tennis-whatsapp-status";
 
@@ -39,7 +40,28 @@ export default async function PaymentSuccessPage({
   let courseIdForOffer: string | null = params.kurs ?? null;
 
   // Nur Stripe-Session aktiviert Buchungen. ?reservation= darf nicht mehr freischalten.
-  if (params.session_id && (await listAllStripeSecretKeys()).length > 0) {
+  if (params.session_id && isShowcaseSessionId(params.session_id)) {
+    const showcase = await loadShowcaseCheckout(params.session_id);
+    title = showcase?.title ?? null;
+    kind = showcase?.kind ?? "course";
+    if (showcase?.kind === "subscription") {
+      const subscription = await prisma.subscription.findFirst({
+        where: { stripeSessionId: params.session_id },
+        include: { plan: { include: { section: { select: { name: true } } } } },
+      });
+      membershipCard = subscription?.plan.kind === "MEMBERSHIP";
+      tennisSeasonCard = subscription
+        ? isTennisSeasonAddonPlan(subscription.plan)
+        : false;
+    }
+    if (showcase?.kind === "course") {
+      const enrollment = await prisma.enrollment.findFirst({
+        where: { stripeSessionId: params.session_id },
+        select: { courseId: true },
+      });
+      courseIdForOffer = enrollment?.courseId ?? courseIdForOffer;
+    }
+  } else if (params.session_id && (await listAllStripeSecretKeys()).length > 0) {
     try {
       const result = await fulfillStripeSession(params.session_id);
       title = result?.title ?? null;

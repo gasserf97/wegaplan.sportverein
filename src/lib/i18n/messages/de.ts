@@ -295,6 +295,17 @@ export const de = {
     subscriptionsHint:
       "Mitgliedschaften und Saisonkarten. Vereinsmitgliedschaft zuerst, danach Zusatzmitgliedschaften.",
     noSubscriptions: "Noch keine Mitgliedschaften veröffentlicht.",
+    demoHeading: "Beispiel-Zugänge",
+    demoIntro:
+      "Vorführung mit erfundenen Personen. Zum Anmelden Benutzername und Passwort verwenden.",
+    demoAdmin: "Haupt-Admin",
+    demoMember: "Mitglied mit Familie",
+    demoTennis: "Sektions-Admin Tennis",
+    demoFootball: "Sektions-Admin Fußball",
+    demoFootballMember: "Mitglied Fußball",
+    demoCard:
+      "Kartenzahlung läuft im Stripe-Testmodus. Testkarte 4242 4242 4242 4242, Ablauf 12/34, CVC 123. Es wird nichts abgebucht.",
+    demoLogin: "Zur Anmeldung",
   },
 
   courses: {
@@ -800,6 +811,17 @@ export const de = {
 
   payment: {
     successTitle: "Zahlung bestätigt",
+    stripeTestTitle: "Stripe-Testzahlung",
+    stripeTestEyebrow: "Stripe-Testmodus",
+    stripeTestIntro:
+      "Vorführung: die Zahlung wird wie über ein Stripe-Testkonto abgeschlossen. Die Karte 4242 … ist die offizielle Testkarte, es gibt keine echte Abbuchung.",
+    stripeTestCard: "Kartennummer",
+    stripeTestExpiry: "Ablauf",
+    stripeTestCvc: "CVC",
+    stripeTestHint: "Andere Kartennummern werden abgelehnt.",
+    stripeTestCardError: "Nur die Stripe-Testkarte 4242 4242 4242 4242 wird akzeptiert.",
+    stripeTestPay: "{amount} testweise zahlen",
+    stripeTestCancel: "Abbrechen",
     successAbo: "Ihre Mitgliedschaft „{title}“ ist gespeichert.",
     successCourt: "Ihre Reservierung für „{title}“ ist bestätigt.",
     successDevice: "Ihre Auto-Reservierung für „{title}“ ist bestätigt.",

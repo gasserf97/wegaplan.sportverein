@@ -20,6 +20,21 @@ export function isValidStripeSecretKey(key: string) {
   return /^(sk|rk)_(test|live)_/.test(cleaned);
 }
 
+/**
+ * Vorführung ohne echten Stripe-Schlüssel: Checkout bleibt in der App und
+ * akzeptiert nur die offizielle Testkarte. Liegt ein sk_test_/sk_live_-Schlüssel,
+ * geht die Zahlung an dieses Stripe-Konto.
+ */
+export function isStripeDemoMode() {
+  if (cleanStripeEnv(process.env.SHOWCASE_MODE) !== "1") return false;
+  if (getGlobalStripeSecretKey()) return false;
+  for (const [name, value] of Object.entries(process.env)) {
+    if (!name.endsWith("STRIPE_SECRET_KEY")) continue;
+    if (isValidStripeSecretKey(value ?? "")) return false;
+  }
+  return true;
+}
+
 /** Globaler Env-Key (ohne Sektions-Override). */
 export function getGlobalStripeSecretKey() {
   const key = cleanStripeEnv(process.env.STRIPE_SECRET_KEY);
@@ -71,7 +86,10 @@ export function getStripe(secretKey?: string | null) {
 
 export async function getStripeForSection(sectionId: string | null | undefined) {
   const { resolveSectionStripeSecretKey } = await import("@/lib/section-payments");
-  const key = await resolveSectionStripeSecretKey(sectionId);
+  let key = await resolveSectionStripeSecretKey(sectionId);
+  if (!key && cleanStripeEnv(process.env.SHOWCASE_MODE) === "1") {
+    key = getGlobalStripeSecretKey();
+  }
   if (!key) {
     throw new Error("Stripe ist für diese Sektion nicht konfiguriert.");
   }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/auth-form";
+import { DemoLogins } from "@/components/demo-logins";
 import { getCurrentUser } from "@/lib/auth";
 import { getServerI18n } from "@/lib/i18n";
 import { getLoggedInHomePath } from "@/lib/membership";
@@ -32,12 +33,15 @@ export default async function LoginPage({
   }
 
   return (
-    <div className="mx-auto w-full max-w-md px-4 py-16 sm:px-6">
-      <h1 className="text-4xl">{t("auth.loginTitle")}</h1>
-      <p className="mt-2 mb-8 text-sm text-muted-foreground">
-        {t("auth.loginDesc")}
-      </p>
-      <AuthForm mode="login" nextPath={nextPath} />
+    <div className="mx-auto grid w-full max-w-5xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:items-start">
+      <div>
+        <h1 className="text-4xl">{t("auth.loginTitle")}</h1>
+        <p className="mt-2 mb-8 text-sm text-muted-foreground">
+          {t("auth.loginDesc")}
+        </p>
+        <AuthForm mode="login" nextPath={nextPath} />
+      </div>
+      <DemoLogins t={t} />
     </div>
   );
 }

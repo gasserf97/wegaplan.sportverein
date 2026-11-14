@@ -27,6 +27,7 @@ import {
   stripeCheckoutUnavailableError,
 } from "@/lib/stripe";
 import { isSectionStripeConfigured } from "@/lib/section-payments";
+import { startShowcaseCheckout } from "@/lib/stripe-demo";
 import { formatSlotDate, formatSlotTime } from "@/lib/booking";
 
 export type DeviceDraftFields = {
@@ -118,6 +119,17 @@ export async function beginDeviceReservationCheckout(reservationId: string) {
 
   if (!(await isSectionStripeConfigured(reservation.device.sectionId))) {
     return { error: stripeCheckoutUnavailableError };
+  }
+
+  const showcase = await startShowcaseCheckout(async (sessionId) => {
+    await prisma.deviceReservation.update({
+      where: { id: reservation.id },
+      data: { stripeSessionId: sessionId },
+    });
+  });
+  if (showcase) {
+    revalidateDeviceBookingPaths();
+    return showcase;
   }
 
   try {

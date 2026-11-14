@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { SubscriptionInterval } from "@/generated/prisma/client";
 import { redirect } from "next/navigation";
 import { CourseCard } from "@/components/course-card";
+import { DemoLogins } from "@/components/demo-logins";
 import { buttonVariants } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
 import {
@@ -108,20 +109,21 @@ export default async function HomePage() {
               </Link>
             </div>
           </div>
-          <ol className="grid gap-4 rounded-xl border border-border bg-white p-6 shadow-sm">
-            {guestSteps.map((item) => (
-              <li key={item.step} className="flex gap-4">
-                <span className="font-heading text-2xl font-bold text-primary">
-                  {item.step}
-                </span>
-                <div>
-                  <p className="font-medium">{item.title}</p>
-                  <p className="text-sm leading-6 text-muted-foreground">{item.text}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
+          <DemoLogins t={t} />
         </div>
+        <ol className="relative mx-auto grid w-full max-w-6xl gap-4 px-4 pb-14 sm:grid-cols-3 sm:px-6">
+          {guestSteps.map((item) => (
+            <li key={item.step} className="flex gap-4 rounded-xl border border-border bg-white p-4">
+              <span className="font-heading text-2xl font-bold text-primary">
+                {item.step}
+              </span>
+              <div>
+                <p className="font-medium">{item.title}</p>
+                <p className="text-sm leading-6 text-muted-foreground">{item.text}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
       </section>
 
       <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6">

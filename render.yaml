@@ -30,6 +30,10 @@ services:
         generateValue: true
       - key: NEXT_PUBLIC_APP_URL
         value: https://app.asclajen.com
+      # Vorführung: ohne Stripe-Schlüssel lokaler Test-Checkout (Karte 4242…).
+      # Echter Stripe-Test: STRIPE_SECRET_KEY=sk_test_… setzen, dann entfällt die Simulation.
+      - key: SHOWCASE_MODE
+        value: "1"
       # Fallback = Hauptverein-Konto, wenn die Sektion keine eigenen Keys hat.
       # Pro Sektion als zusätzliche Secret-Env-Variablen pflegen, z. B.
       # PAYMENT_TENNIS_STRIPE_SECRET_KEY / PAYMENT_TENNIS_STRIPE_WEBHOOK_SECRET
