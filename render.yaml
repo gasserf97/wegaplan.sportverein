@@ -11,7 +11,8 @@ services:
     branch: main
     # Build hat kein privates Netz: die interne DB-URL (dpg-…-a) ist dort nicht erreichbar.
     buildCommand: npm ci && npx prisma generate && npm run build
-    preDeployCommand: npx prisma migrate deploy
+    # Seed legt die Beispiel-Zugänge, Kurse und Mitgliedschaften an (Upserts, kein Löschen).
+    preDeployCommand: npx prisma migrate deploy && npx prisma db seed
     startCommand: npm start
     healthCheckPath: /
     disk:
