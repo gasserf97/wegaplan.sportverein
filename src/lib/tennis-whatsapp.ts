@@ -1,5 +1,5 @@
 export const TENNIS_WHATSAPP_INVITE_URL =
-  "https://chat.whatsapp.com/DEEkZNpr6wXILtATxw15rP?s=cl&p=i&mlu=4&ilr=4&iam=2";
+  "https://chat.whatsapp.com/EXSoj1tvWNHAj9jGhwH3Xy";
 
 /** Gesetzt, wenn „Ich bin schon Mitglied“ gewählt wurde. */
 export const TENNIS_WHATSAPP_MEMBER_COOKIE = "tennis-whatsapp-member";
