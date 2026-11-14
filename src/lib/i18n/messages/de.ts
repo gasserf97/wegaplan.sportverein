@@ -154,7 +154,7 @@ export const de = {
 
   auth: {
     loginTitle: "Anmelden",
-    loginDesc: "Mit E-Mail und Passwort.",
+    loginDesc: "Mit Benutzername oder E-Mail und Passwort.",
     registerTitle: "Registrieren",
     registerDesc:
       "Zuerst nur die E-Mail. Nach der Bestätigung legen Sie Ihr Passwort fest und ergänzen die Stammdaten.",
@@ -180,7 +180,7 @@ export const de = {
     city: "Wohnort",
     birthDate: "Geburtsdatum",
     username: "Benutzername",
-    usernameOrEmail: "E-Mail",
+    usernameOrEmail: "Benutzername oder E-Mail",
     password: "Passwort",
     passwordConfirm: "Passwort wiederholen",
     forgotPassword: "Passwort vergessen?",
@@ -242,7 +242,7 @@ export const de = {
       usernameInvalid: "Ungültiger Benutzername.",
       invalidData: "Ungültige Angaben.",
       usernameTaken: "Dieser Benutzername ist bereits vergeben.",
-      wrongCredentials: "E-Mail oder Passwort ist falsch.",
+      wrongCredentials: "Benutzername, E-Mail oder Passwort ist falsch.",
       demoUnavailable:
         "Demo-Zugang nicht verfügbar. Bitte npm run db:seed ausführen.",
     },
@@ -297,7 +297,7 @@ export const de = {
     noSubscriptions: "Noch keine Mitgliedschaften veröffentlicht.",
     demoHeading: "Beispiel-Zugänge",
     demoIntro:
-      "Vorführung mit erfundenen Personen. Zum Anmelden Benutzername und Passwort verwenden.",
+      "Vorführung mit erfundenen Personen. Ein Klick meldet mit diesem Zugang an.",
     demoAdmin: "Haupt-Admin",
     demoMember: "Mitglied mit Familie",
     demoTennis: "Sektions-Admin Tennis",
@@ -1266,7 +1266,7 @@ export const de = {
     },
     auth: {
       usernameTaken: "Dieser Benutzername ist bereits vergeben.",
-      wrongCredentials: "E-Mail oder Passwort ist falsch.",
+      wrongCredentials: "Benutzername, E-Mail oder Passwort ist falsch.",
       demoUnavailable:
         "Demo-Zugang nicht verfügbar. Bitte npm run db:seed ausführen.",
       adminOnly: "Nur Haupt-Administratoren.",

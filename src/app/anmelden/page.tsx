@@ -15,10 +15,10 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; hinweis?: string }>;
 }) {
   const { t } = await getServerI18n();
-  const { next } = await searchParams;
+  const { next, hinweis } = await searchParams;
   const nextPath =
     next?.startsWith("/") && !next.startsWith("//") ? next : "/";
   const user = await getCurrentUser();
@@ -39,9 +39,14 @@ export default async function LoginPage({
         <p className="mt-2 mb-8 text-sm text-muted-foreground">
           {t("auth.loginDesc")}
         </p>
+        {hinweis ? (
+          <p className="mb-4 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {hinweis}
+          </p>
+        ) : null}
         <AuthForm mode="login" nextPath={nextPath} />
       </div>
-      <DemoLogins t={t} />
+      <DemoLogins nextPath={nextPath} />
     </div>
   );
 }

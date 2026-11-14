@@ -152,7 +152,7 @@ export const it = {
   },
   auth: {
     loginTitle: "Accedi",
-    loginDesc: "Con e-mail e password.",
+    loginDesc: "Con nome utente o e-mail e password.",
     registerTitle: "Crea account",
     registerDesc:
       "Prima solo l’e-mail. Dopo la conferma imposti la password e completi i dati.",
@@ -178,7 +178,7 @@ export const it = {
     city: "Comune",
     birthDate: "Data di nascita",
     username: "Nome utente",
-    usernameOrEmail: "E-mail",
+    usernameOrEmail: "Nome utente o e-mail",
     password: "Password",
     passwordConfirm: "Ripeti la password",
     forgotPassword: "Password dimenticata?",
@@ -234,6 +234,7 @@ export const it = {
       usernameTaken: "Questo nome utente è già in uso.",
       invalidData: "Dati non validi.",
       loginFailed: "Nome utente o password errati.",
+      wrongCredentials: "Nome utente, e-mail o password non corretti.",
       demoUnavailable: "Accesso demo non disponibile. Eseguire npm run db:seed.",
     },
   },
@@ -285,7 +286,7 @@ export const it = {
     noSubscriptions: "Al momento non ci sono abbonamenti pubblicati.",
     demoHeading: "Accessi di esempio",
     demoIntro:
-      "Dimostrazione con persone inventate. Per entrare usate nome utente e password.",
+      "Dimostrazione con persone inventate. Un clic entra con questo accesso.",
     demoAdmin: "Amministratore",
     demoMember: "Socio con famiglia",
     demoTennis: "Admin sezione tennis",

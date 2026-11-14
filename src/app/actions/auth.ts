@@ -14,6 +14,7 @@ import {
   findUserByVerifyToken,
   issueEmailVerification,
 } from "@/lib/email-verification";
+import { findDemoAccount } from "@/lib/demo-accounts";
 import { getServerI18n } from "@/lib/i18n";
 import {
   isLoginLocked,
@@ -60,8 +61,20 @@ const registerSchema = z.object({
   email: emailSchema,
 });
 
+const loginIdentifierSchema = z
+  .string()
+  .trim()
+  .min(1, { error: "Bitte Benutzername oder E-Mail eingeben." })
+  .refine(
+    (value) =>
+      value.includes("@")
+        ? emailSchema.safeParse(value).success
+        : usernameSchema.safeParse(value).success,
+    { error: "Bitte einen gültigen Benutzernamen oder eine E-Mail-Adresse eingeben." },
+  );
+
 const loginSchema = z.object({
-  email: emailSchema,
+  login: loginIdentifierSchema,
   password: z.string().min(1, { error: "Bitte Ihr Passwort eingeben." }),
 });
 
@@ -78,10 +91,15 @@ const setPasswordSchema = z
     path: ["passwordConfirm"],
   });
 
-async function findUserForLogin(email: string) {
-  const lowered = email.trim().toLowerCase();
+async function findUserForLogin(login: string) {
+  const value = login.trim().toLowerCase();
+  if (value.includes("@")) {
+    return prisma.user.findFirst({
+      where: { email: { equals: value, mode: "insensitive" } },
+    });
+  }
   return prisma.user.findFirst({
-    where: { email: { equals: lowered, mode: "insensitive" } },
+    where: { username: { equals: value, mode: "insensitive" } },
   });
 }
 
@@ -332,16 +350,17 @@ export async function loginAction(
   _prev: AuthState,
   formData: FormData,
 ): Promise<AuthState> {
+  const { t } = await getServerI18n();
   const parsed = loginSchema.safeParse({
-    email: formData.get("email") ?? formData.get("username"),
+    login: formData.get("login") ?? formData.get("email") ?? formData.get("username"),
     password: formData.get("password"),
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Ungültige Angaben." };
+    return { error: parsed.error.issues[0]?.message ?? t("auth.validation.invalidData") };
   }
 
-  const user = await findUserForLogin(parsed.data.email);
+  const user = await findUserForLogin(parsed.data.login);
 
   const lockedUntil = user?.loginLockedUntil ?? null;
   if (user && lockedUntil && isLoginLocked(lockedUntil)) {
@@ -364,7 +383,7 @@ export async function loginAction(
         return { error: loginLockedMessage(t, next.loginLockedUntil) };
       }
     }
-    return { error: "E-Mail oder Passwort ist falsch." };
+    return { error: t("auth.validation.wrongCredentials") };
   }
 
   if (user.failedLoginCount > 0 || user.loginLockedUntil) {
@@ -398,6 +417,22 @@ export async function loginAction(
   await recordLastLogin(user.id);
 
   redirect(await resolvePostAuthPath(user.id, formData.get("next")));
+}
+
+/** Ein Klick auf einen Beispielzugang. Das Passwort kommt nicht aus dem Formular. */
+export async function demoLoginAction(formData: FormData): Promise<void> {
+  const account = findDemoAccount(String(formData.get("username") ?? ""));
+  if (!account) {
+    redirect("/anmelden");
+  }
+  const data = new FormData();
+  data.set("login", account.username);
+  data.set("password", account.password);
+  data.set("next", String(formData.get("next") ?? "/"));
+  const result = await loginAction(null, data);
+  if (result && "error" in result) {
+    redirect(`/anmelden?hinweis=${encodeURIComponent(result.error)}`);
+  }
 }
 
 export type PasswordResetRequestState =

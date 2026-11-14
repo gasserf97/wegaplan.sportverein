@@ -97,12 +97,16 @@ export function AuthForm({
         <p className="text-sm text-muted-foreground">{t("auth.registerHint")}</p>
       ) : null}
       <div className="grid gap-2">
-        <Label htmlFor="email">{t("auth.email")}</Label>
+        <Label htmlFor="email">
+          {mode === "login" ? t("auth.usernameOrEmail") : t("auth.email")}
+        </Label>
         <Input
           id="email"
-          name="email"
-          type="email"
-          autoComplete="email"
+          name={mode === "login" ? "login" : "email"}
+          type={mode === "login" ? "text" : "email"}
+          autoComplete={mode === "login" ? "username" : "email"}
+          autoCapitalize="none"
+          spellCheck={false}
           defaultValue={registerDraft?.email}
           required
         />

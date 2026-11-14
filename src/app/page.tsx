@@ -109,7 +109,7 @@ export default async function HomePage() {
               </Link>
             </div>
           </div>
-          <DemoLogins t={t} />
+          <DemoLogins />
         </div>
         <ol className="relative mx-auto grid w-full max-w-6xl gap-4 px-4 pb-14 sm:grid-cols-3 sm:px-6">
           {guestSteps.map((item) => (
