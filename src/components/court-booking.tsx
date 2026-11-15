@@ -354,7 +354,7 @@ export function CourtBookingCalendar({
       seriesUntilDate={seriesUntilDate}
       setSeriesUntilDate={setSeriesUntilDate}
       estimatedPriceCents={displayPriceCents}
-      creditBalanceCents={creditBalanceCents}
+      availableCreditCents={adminBlockFree ? 0 : availableCreditCents}
       creditApplied={displayCreditApplied}
       amountDue={displayAmountDue}
       useCredit={useCredit}
@@ -921,7 +921,7 @@ function BookingFormFields({
   seriesUntilDate,
   setSeriesUntilDate,
   estimatedPriceCents,
-  creditBalanceCents,
+  availableCreditCents,
   creditApplied,
   amountDue,
   useCredit,
@@ -949,7 +949,7 @@ function BookingFormFields({
   seriesUntilDate: string;
   setSeriesUntilDate: (value: string) => void;
   estimatedPriceCents: number;
-  creditBalanceCents: number;
+  availableCreditCents: number;
   creditApplied: number;
   amountDue: number;
   useCredit: boolean;
