@@ -1,4 +1,4 @@
-import { type CreditTransactionKind, type Prisma } from "@/generated/prisma/client";
+import { type CreditTransactionKind } from "@/generated/prisma/client";
 import { sendCourseEnrollmentConfirmations } from "@/lib/booking-confirmation";
 import { enrollmentCreditRefundCents } from "@/lib/payment-amounts";
 import { prisma } from "@/lib/prisma";
@@ -82,9 +82,15 @@ type CreditLedger = {
   sectionId?: string | null;
 };
 
+/** Transaktion des erweiterten Clients (nicht Prisma.TransactionClient). */
+type CreditTx = Omit<
+  typeof prisma,
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$extends" | "$use"
+>;
+
 /** Zieht zuerst vom Sektionsguthaben ab, den Rest vom Vereinsguthaben. */
 async function drawCredit(
-  tx: Prisma.TransactionClient,
+  tx: CreditTx,
   userId: string,
   amountCents: number,
   ledger: CreditLedger,
