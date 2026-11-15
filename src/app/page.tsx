@@ -91,9 +91,6 @@ export default async function HomePage() {
             <h1 className="max-w-xl text-5xl leading-[1.05] text-foreground sm:text-6xl">
               {t("home.headingGuest")}
             </h1>
-            <p className="max-w-lg text-base leading-7 text-muted-foreground sm:text-lg">
-              {t("home.descGuest")}
-            </p>
             <div className="flex flex-wrap gap-3">
               <Link
                 href={membershipHref}
