@@ -683,3 +683,9 @@ model ClubEventRead {
   @@id([eventId, userId])
   @@index([userId])
 }
+
+/// Der Showcase-Seed legt Beispiele nur einmal an. Danach bleiben Löschungen erhalten.
+model SeedMarker {
+  key       String   @id
+  createdAt DateTime @default(now())
+}

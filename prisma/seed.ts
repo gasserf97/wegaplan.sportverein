@@ -8,7 +8,25 @@ function daysFromNow(offsetDays: number, hourUtc = 17) {
   return date;
 }
 
+const SEED_EXAMPLES_MARKER = "examples-initialized";
+
 async function main() {
+  const marker = await prisma.seedMarker.findUnique({
+    where: { key: SEED_EXAMPLES_MARKER },
+  });
+  if (marker) return;
+
+  const [userCount, courseCount, planCount, sectionCount] = await Promise.all([
+    prisma.user.count(),
+    prisma.course.count(),
+    prisma.subscriptionPlan.count(),
+    prisma.section.count(),
+  ]);
+  if (userCount > 0 || courseCount > 0 || planCount > 0 || sectionCount > 0) {
+    await prisma.seedMarker.create({ data: { key: SEED_EXAMPLES_MARKER } });
+    return;
+  }
+
   const adminHash = await hash("Admin1234", 10);
   const userHash = await hash("User1234", 10);
   const tennisHash = await hash("Tennis1234", 10);
@@ -986,6 +1004,8 @@ async function main() {
       createdById: admin.id,
     },
   });
+
+  await prisma.seedMarker.create({ data: { key: SEED_EXAMPLES_MARKER } });
 }
 
 main()
