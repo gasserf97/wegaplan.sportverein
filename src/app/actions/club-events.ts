@@ -53,6 +53,96 @@ function formError(error: string, formData: FormData): ClubEventFormState {
   return { error, fields: draftFromForm(formData) };
 }
 
+type ParsedClubEvent = {
+  body: string;
+  startsAt: Date;
+  endsAt: Date;
+  audienceAll: boolean;
+  audienceAdmins: boolean;
+  audienceClub: boolean;
+  sections: { id: string }[];
+};
+
+async function parseClubEventForm(
+  formData: FormData,
+  options: { hasImage: boolean },
+): Promise<{ ok: true; value: ParsedClubEvent } | { ok: false; state: ClubEventFormState }> {
+  const draft = draftFromForm(formData);
+  const parsedBody = bodySchema.safeParse(draft.body);
+  if (!parsedBody.success) {
+    return {
+      ok: false,
+      state: formError(
+        parsedBody.error.issues[0]?.message ?? "Bitte einen Text schreiben.",
+        formData,
+      ),
+    };
+  }
+  if (!parsedBody.data && !options.hasImage) {
+    return {
+      ok: false,
+      state: formError("Bitte einen Text schreiben oder ein Bild auswählen.", formData),
+    };
+  }
+
+  const startsAt = clubDayStart(draft.startsOn.trim());
+  const endsAt = clubDayEnd(draft.endsOn.trim());
+  if (!startsAt || !endsAt) {
+    return {
+      ok: false,
+      state: formError(
+        "Bitte Beginn und Ende des Veröffentlichungszeitraums angeben.",
+        formData,
+      ),
+    };
+  }
+  if (endsAt < startsAt) {
+    return {
+      ok: false,
+      state: formError("Das Ende liegt vor dem Beginn.", formData),
+    };
+  }
+
+  const sectionIds = [...new Set(draft.sectionIds)];
+  if (
+    !draft.audienceAll &&
+    !draft.audienceAdmins &&
+    !draft.audienceClub &&
+    sectionIds.length === 0
+  ) {
+    return {
+      ok: false,
+      state: formError("Bitte mindestens eine Gruppe auswählen.", formData),
+    };
+  }
+
+  const sections = sectionIds.length
+    ? await prisma.section.findMany({
+        where: { id: { in: sectionIds } },
+        select: { id: true },
+      })
+    : [];
+  if (sections.length !== sectionIds.length) {
+    return {
+      ok: false,
+      state: formError("Eine gewählte Sektion gibt es nicht mehr.", formData),
+    };
+  }
+
+  return {
+    ok: true,
+    value: {
+      body: parsedBody.data,
+      startsAt,
+      endsAt,
+      audienceAll: draft.audienceAll,
+      audienceAdmins: draft.audienceAdmins,
+      audienceClub: draft.audienceClub,
+      sections,
+    },
+  };
+}
+
 function refreshEventSurfaces() {
   revalidatePath("/admin/events");
   revalidatePath("/", "layout");
@@ -65,47 +155,9 @@ export async function createClubEventAction(
   const admin = await requireAdmin();
   if (!admin) return formError("Nur Haupt-Administratoren.", formData);
 
-  const draft = draftFromForm(formData);
   const image = imageFromForm(formData);
-  const parsedBody = bodySchema.safeParse(draft.body);
-  if (!parsedBody.success) {
-    return formError(
-      parsedBody.error.issues[0]?.message ?? "Bitte einen Text schreiben.",
-      formData,
-    );
-  }
-  if (!parsedBody.data && !image) {
-    return formError("Bitte einen Text schreiben oder ein Bild auswählen.", formData);
-  }
-
-  const startsAt = clubDayStart(draft.startsOn.trim());
-  const endsAt = clubDayEnd(draft.endsOn.trim());
-  if (!startsAt || !endsAt) {
-    return formError("Bitte Beginn und Ende des Veröffentlichungszeitraums angeben.", formData);
-  }
-  if (endsAt < startsAt) {
-    return formError("Das Ende liegt vor dem Beginn.", formData);
-  }
-
-  const sectionIds = [...new Set(draft.sectionIds)];
-  if (
-    !draft.audienceAll &&
-    !draft.audienceAdmins &&
-    !draft.audienceClub &&
-    sectionIds.length === 0
-  ) {
-    return formError("Bitte mindestens eine Gruppe auswählen.", formData);
-  }
-
-  const sections = sectionIds.length
-    ? await prisma.section.findMany({
-        where: { id: { in: sectionIds } },
-        select: { id: true },
-      })
-    : [];
-  if (sections.length !== sectionIds.length) {
-    return formError("Eine gewählte Sektion gibt es nicht mehr.", formData);
-  }
+  const parsed = await parseClubEventForm(formData, { hasImage: Boolean(image) });
+  if (!parsed.ok) return parsed.state;
 
   let savedImage: { storageKey: string; mimeType: string } | null = null;
   if (image) {
@@ -117,17 +169,17 @@ export async function createClubEventAction(
   try {
     const event = await prisma.clubEvent.create({
       data: {
-        body: parsedBody.data,
-        startsAt,
-        endsAt,
-        audienceAll: draft.audienceAll,
-        audienceAdmins: draft.audienceAdmins,
-        audienceClub: draft.audienceClub,
+        body: parsed.value.body,
+        startsAt: parsed.value.startsAt,
+        endsAt: parsed.value.endsAt,
+        audienceAll: parsed.value.audienceAll,
+        audienceAdmins: parsed.value.audienceAdmins,
+        audienceClub: parsed.value.audienceClub,
         imageStorageKey: savedImage?.storageKey,
         imageMimeType: savedImage?.mimeType,
         createdById: admin.id,
         sections: {
-          create: sections.map((section) => ({ sectionId: section.id })),
+          create: parsed.value.sections.map((section) => ({ sectionId: section.id })),
         },
       },
       select: { id: true },
@@ -135,6 +187,78 @@ export async function createClubEventAction(
 
     refreshEventSurfaces();
     return { ok: true, id: event.id };
+  } catch {
+    if (savedImage) await deleteStoredFile(savedImage.storageKey);
+    return formError(
+      "Der Hinweis konnte nicht gespeichert werden. Bitte erneut versuchen.",
+      formData,
+    );
+  }
+}
+
+export async function updateClubEventAction(
+  _prev: ClubEventFormState,
+  formData: FormData,
+): Promise<ClubEventFormState> {
+  const admin = await requireAdmin();
+  if (!admin) return formError("Nur Haupt-Administratoren.", formData);
+
+  const eventId = String(formData.get("eventId") ?? "").trim();
+  if (!eventId) return formError("Hinweis nicht gefunden.", formData);
+
+  const existing = await prisma.clubEvent.findUnique({
+    where: { id: eventId },
+    select: { id: true, imageStorageKey: true },
+  });
+  if (!existing) return formError("Dieser Hinweis wurde bereits gelöscht.", formData);
+
+  const image = imageFromForm(formData);
+  const removeImage = formChecked(formData, "removeImage");
+  const keepsExistingImage = Boolean(existing.imageStorageKey) && !removeImage && !image;
+  const parsed = await parseClubEventForm(formData, {
+    hasImage: Boolean(image) || keepsExistingImage,
+  });
+  if (!parsed.ok) return parsed.state;
+
+  let savedImage: { storageKey: string; mimeType: string } | null = null;
+  if (image) {
+    const saved = await saveClubEventImage(image);
+    if (!saved.ok) return formError(saved.error, formData);
+    savedImage = saved;
+  }
+
+  try {
+    await prisma.clubEvent.update({
+      where: { id: eventId },
+      data: {
+        body: parsed.value.body,
+        startsAt: parsed.value.startsAt,
+        endsAt: parsed.value.endsAt,
+        audienceAll: parsed.value.audienceAll,
+        audienceAdmins: parsed.value.audienceAdmins,
+        audienceClub: parsed.value.audienceClub,
+        ...(savedImage
+          ? {
+              imageStorageKey: savedImage.storageKey,
+              imageMimeType: savedImage.mimeType,
+            }
+          : removeImage
+            ? { imageStorageKey: null, imageMimeType: null }
+            : {}),
+        sections: {
+          deleteMany: {},
+          create: parsed.value.sections.map((section) => ({ sectionId: section.id })),
+        },
+        reads: { deleteMany: {} },
+      },
+    });
+
+    const previousKey = existing.imageStorageKey;
+    if (previousKey && (savedImage || removeImage)) {
+      await deleteStoredFile(previousKey);
+    }
+    refreshEventSurfaces();
+    return { ok: true, id: eventId };
   } catch {
     if (savedImage) await deleteStoredFile(savedImage.storageKey);
     return formError(

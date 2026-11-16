@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createClubEventAction,
+  updateClubEventAction,
   type ClubEventFormState,
 } from "@/app/actions/club-events";
 import { Button } from "@/components/ui/button";
@@ -11,19 +12,40 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 
+export type ClubEventFormValues = {
+  id: string;
+  body: string;
+  startsOn: string;
+  endsOn: string;
+  audienceAll: boolean;
+  audienceAdmins: boolean;
+  audienceClub: boolean;
+  sectionIds: string[];
+  imageUrl: string | null;
+};
+
 export function ClubEventForm({
   sections,
+  event,
+  onSaved,
 }: {
   sections: { id: string; name: string }[];
+  event?: ClubEventFormValues;
+  onSaved?: () => void;
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState<
     ClubEventFormState,
     FormData
-  >(createClubEventAction, null);
+  >(event ? updateClubEventAction : createClubEventAction, null);
   const draft = state && "error" in state ? state.fields : undefined;
+  const values = draft ?? event;
+  const fieldId = event?.id ?? "new";
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [removeImage, setRemoveImage] = useState(false);
   const previewRef = useRef<string | null>(null);
+  const onSavedRef = useRef(onSaved);
+  onSavedRef.current = onSaved;
 
   function setPreview(next: string | null) {
     if (previewRef.current) URL.revokeObjectURL(previewRef.current);
@@ -44,47 +66,73 @@ export function ClubEventForm({
       previewRef.current = null;
     }
     setPreviewUrl(null);
+    setRemoveImage(false);
+    onSavedRef.current?.();
     router.refresh();
   }, [state, router]);
 
   return (
     <form
-      key={state && "ok" in state ? state.id : "new-event"}
+      key={
+        state && "ok" in state
+          ? `${event?.id ?? "new"}-${state.id}`
+          : (event?.id ?? "new-event")
+      }
       action={formAction}
       className="grid gap-5"
     >
+      {event ? <input type="hidden" name="eventId" value={event.id} /> : null}
       <div className="grid gap-2">
-        <Label htmlFor="event-body">Text</Label>
+        <Label htmlFor={`event-body-${fieldId}`}>Text</Label>
         <Textarea
-          id="event-body"
+          id={`event-body-${fieldId}`}
           name="body"
           rows={6}
           maxLength={4000}
-          defaultValue={draft?.body}
+          defaultValue={values?.body}
           placeholder="Zum Beispiel: Mitgliederversammlung am Donnerstag, 19 Uhr, im Vereinsheim."
         />
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor="event-image">Bild</Label>
+        <Label htmlFor={`event-image-${fieldId}`}>Bild</Label>
         <Input
-          id="event-image"
+          id={`event-image-${fieldId}`}
           name="image"
           type="file"
           accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
           className="text-sm"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
+          onChange={(change) => {
+            const file = change.target.files?.[0];
+            setRemoveImage(false);
             setPreview(file ? URL.createObjectURL(file) : null);
           }}
         />
         <p className="text-xs text-muted-foreground">
           Optional. JPG, PNG oder WebP, höchstens 10 MB. Text oder Bild reicht.
         </p>
+        {event?.imageUrl && !previewUrl ? (
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="removeImage"
+              className="size-4 accent-primary"
+              checked={removeImage}
+              onChange={(change) => setRemoveImage(change.target.checked)}
+            />
+            Bild entfernen
+          </label>
+        ) : null}
         {previewUrl ? (
           <img
             src={previewUrl}
             alt="Vorschau"
+            className="max-h-64 w-full rounded-lg object-contain"
+          />
+        ) : event?.imageUrl && !removeImage ? (
+          <img
+            src={event.imageUrl}
+            alt=""
             className="max-h-64 w-full rounded-lg object-contain"
           />
         ) : null}
@@ -101,7 +149,7 @@ export function ClubEventForm({
           <input
             type="checkbox"
             name="audienceAll"
-            defaultChecked={draft?.audienceAll}
+            defaultChecked={values?.audienceAll}
             className="size-4 accent-primary"
           />
           Alle
@@ -110,7 +158,7 @@ export function ClubEventForm({
           <input
             type="checkbox"
             name="audienceAdmins"
-            defaultChecked={draft?.audienceAdmins}
+            defaultChecked={values?.audienceAdmins}
             className="size-4 accent-primary"
           />
           Hauptadmin
@@ -119,7 +167,7 @@ export function ClubEventForm({
           <input
             type="checkbox"
             name="audienceClub"
-            defaultChecked={draft?.audienceClub}
+            defaultChecked={values?.audienceClub}
             className="size-4 accent-primary"
           />
           Sportverein
@@ -130,7 +178,7 @@ export function ClubEventForm({
               type="checkbox"
               name="sectionIds"
               value={section.id}
-              defaultChecked={draft?.sectionIds.includes(section.id)}
+              defaultChecked={values?.sectionIds.includes(section.id)}
               className="size-4 accent-primary"
             />
             {section.name}-Mitglieder
@@ -140,40 +188,42 @@ export function ClubEventForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
-          <Label htmlFor="event-starts" required>
+          <Label htmlFor={`event-starts-${fieldId}`} required>
             Veröffentlichen von
           </Label>
           <Input
-            id="event-starts"
+            id={`event-starts-${fieldId}`}
             name="startsOn"
             type="date"
             required
-            defaultValue={draft?.startsOn}
+            defaultValue={values?.startsOn}
           />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="event-ends" required>
+          <Label htmlFor={`event-ends-${fieldId}`} required>
             Veröffentlichen bis
           </Label>
           <Input
-            id="event-ends"
+            id={`event-ends-${fieldId}`}
             name="endsOn"
             type="date"
             required
-            defaultValue={draft?.endsOn}
+            defaultValue={values?.endsOn}
           />
         </div>
       </div>
 
       <div className="flex flex-col items-start gap-2">
         <Button type="submit" disabled={pending}>
-          {pending ? "Speichern…" : "Veröffentlichen"}
+          {pending ? "Speichern…" : event ? "Speichern" : "Veröffentlichen"}
         </Button>
         {state && "error" in state ? (
           <p className="text-sm text-destructive">{state.error}</p>
         ) : null}
         {state && "ok" in state ? (
-          <p className="text-sm text-primary">Hinweis veröffentlicht.</p>
+          <p className="text-sm text-primary">
+            {event ? "Hinweis gespeichert." : "Hinweis veröffentlicht."}
+          </p>
         ) : null}
       </div>
     </form>

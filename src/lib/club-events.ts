@@ -44,6 +44,16 @@ export function clubDayStart(isoDate: string): Date | null {
   return start;
 }
 
+/** Kalendertag Europe/Rome als `YYYY-MM-DD` für Datumsfelder. */
+export function clubDayIso(instant: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: CLUB_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(instant);
+}
+
 /** Ende des Kalendertags Europe/Rome (inklusive). */
 export function clubDayEnd(isoDate: string): Date | null {
   if (!ISO_DATE.test(isoDate)) return null;
