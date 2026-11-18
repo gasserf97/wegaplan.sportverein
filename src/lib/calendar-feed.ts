@@ -4,7 +4,6 @@ import { isActiveCourseEnrollment } from "@/lib/courses";
 import { ageFromBirthDate } from "@/lib/pricing";
 import { prisma } from "@/lib/prisma";
 
-const FEED_NAME = "ASC Lajen";
 const PAST_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 
 export type CalendarFeedEvent = {
@@ -75,14 +74,15 @@ function foldLine(line: string) {
 export function buildCalendarIcs(
   events: CalendarFeedEvent[],
   now = new Date(),
+  clubName = "Sportverein",
 ) {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//ASC Lajen//Kalender//DE",
+    `PRODID:-//${clubName}//Kalender//DE`,
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    `X-WR-CALNAME:${icsEscape(FEED_NAME)}`,
+    `X-WR-CALNAME:${icsEscape(clubName)}`,
     "X-WR-TIMEZONE:Europe/Rome",
     "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
     "X-PUBLISHED-TTL:PT1H",

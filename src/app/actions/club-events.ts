@@ -6,6 +6,7 @@ import { requireAdmin, requireUser } from "@/lib/auth";
 import { clubDayEnd, clubDayStart } from "@/lib/club-events";
 import { formChecked, formText } from "@/lib/form-draft";
 import { prisma } from "@/lib/prisma";
+import { requireCurrentClubId } from "@/lib/tenant";
 import { deleteStoredFile, saveClubEventImage } from "@/lib/uploads";
 
 export type ClubEventDraft = {
@@ -169,6 +170,7 @@ export async function createClubEventAction(
   try {
     const event = await prisma.clubEvent.create({
       data: {
+        clubId: await requireCurrentClubId(),
         body: parsed.value.body,
         startsAt: parsed.value.startsAt,
         endsAt: parsed.value.endsAt,

@@ -21,6 +21,7 @@ import {
 import { loadBookableCoursesWithSpotsLeft } from "@/lib/courses";
 import { expireStalePendingEnrollments } from "@/lib/expire-pending";
 import { CourseCheckoutCleanup } from "@/components/court-checkout-cleanup";
+import { clubDisplayName } from "@/lib/club-settings";
 import { getServerI18n } from "@/lib/i18n";
 import type { TFunction } from "@/lib/i18n/types";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ function intervalPerLabel(interval: SubscriptionInterval, t: TFunction): string 
 
 export default async function HomePage() {
   const { t } = await getServerI18n();
+  const clubName = await clubDisplayName();
   const user = await getCurrentUser();
   if (user) {
     redirect(await getLoggedInHomePath(user.id));
@@ -86,7 +88,7 @@ export default async function HomePage() {
         <div className="relative mx-auto grid w-full max-w-6xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-end lg:py-20">
           <div className="space-y-5">
             <p className="text-xs font-semibold tracking-[0.22em] text-primary uppercase">
-              {t("home.eyebrow")}
+              {clubName}
             </p>
             <h1 className="max-w-xl text-5xl leading-[1.05] text-foreground sm:text-6xl">
               {t("home.headingGuest")}

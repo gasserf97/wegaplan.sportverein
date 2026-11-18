@@ -18,6 +18,7 @@ import {
 } from "@/lib/activate-device-reservation";
 import { canBookFleetDevices } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { requireCurrentClubId } from "@/lib/tenant";
 import {
   formatStripeCheckoutError,
   getAppUrl,
@@ -220,6 +221,7 @@ export async function createDeviceAction(formData: FormData): Promise<DeviceActi
   const maxSort = await prisma.device.aggregate({ _max: { sortOrder: true } });
   await prisma.device.create({
     data: {
+      clubId: await requireCurrentClubId(),
       name,
       category,
       pricingMode,

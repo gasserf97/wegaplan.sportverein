@@ -64,6 +64,17 @@ services:
       # Optional. Backup-Mail Abos/Kurse (Standard: info@asclajen.com).
       - key: REGISTRATION_BACKUP_EMAIL
         sync: false
+      # Hauptdomain des Betreibers. Vereine: {slug}.PLATFORM_DOMAIN
+      - key: PLATFORM_DOMAIN
+        sync: false
+      - key: CLUB_SECRETS_KEY
+        sync: false
+      - key: PLATFORM_ADMIN_USERNAME
+        sync: false
+      - key: PLATFORM_ADMIN_PASSWORD
+        sync: false
+      - key: PLATFORM_ADMIN_EMAIL
+        sync: false
 
   # Stündlich (UTC): Abo-Verlängerungen + abgelaufene Wartelisten-Angebote.
   # Ruft die Web-App auf; CRON_SECRET muss mit dem Web-Service übereinstimmen.

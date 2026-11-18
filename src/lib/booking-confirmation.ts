@@ -71,9 +71,9 @@ async function deliverConfirmationMail(input: {
   logLabel: string;
   entityId: string;
 }): Promise<ConfirmationSendResult> {
-  if (!isMailConfigured()) {
+  if (!(await isMailConfigured())) {
     const message =
-      mailConfigIssue() ?? "E-Mail-Versand ist nicht konfiguriert.";
+      (await mailConfigIssue()) ?? "E-Mail-Versand ist nicht konfiguriert.";
     console.error(input.logLabel, input.entityId, message);
     return { sent: false, message };
   }

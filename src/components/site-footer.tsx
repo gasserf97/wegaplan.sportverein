@@ -6,8 +6,14 @@ import { useI18n } from "@/components/locale-provider";
 
 export function SiteFooter({
   reserveTabBar = false,
+  clubName = "Sportverein",
+  impressumUrl = "",
+  showLegacyTagline = false,
 }: {
   reserveTabBar?: boolean;
+  clubName?: string;
+  impressumUrl?: string;
+  showLegacyTagline?: boolean;
 }) {
   const { t } = useI18n();
 
@@ -19,10 +25,10 @@ export function SiteFooter({
             <ClubLogo variant="icon" href={null} className="size-10" />
           </span>
           <div>
-            <p className="font-heading font-semibold text-white">
-              ASC Lajen Raiffeisen
-            </p>
-            <p className="text-white/70">{t("nav.footerClub")}</p>
+            <p className="font-heading font-semibold text-white">{clubName}</p>
+            {showLegacyTagline ? (
+              <p className="text-white/70">{t("nav.footerClub")}</p>
+            ) : null}
           </div>
         </div>
         <div className="flex flex-col gap-2 sm:items-end">
@@ -34,14 +40,16 @@ export function SiteFooter({
             >
               {t("nav.privacy")}
             </Link>
-            <a
-              href="https://asclajen.com/impressum"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-white/80 underline-offset-4 hover:text-white hover:underline"
-            >
-              {t("nav.impressum")}
-            </a>
+            {impressumUrl ? (
+              <a
+                href={impressumUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-white/80 underline-offset-4 hover:text-white hover:underline"
+              >
+                {t("nav.impressum")}
+              </a>
+            ) : null}
           </div>
         </div>
       </div>

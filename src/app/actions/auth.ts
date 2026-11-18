@@ -5,6 +5,7 @@ import { hash, compare } from "bcryptjs";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { requireCurrentClubId } from "@/lib/tenant";
 import {
   clearSessionCookie,
   readRequestClientChannel,
@@ -169,7 +170,7 @@ export async function checkUsernameAvailabilityAction(
     };
   }
 
-  const existing = await prisma.user.findUnique({
+  const existing = await prisma.user.findFirst({
     where: { username: normalizeUsername(parsed.data) },
     select: { id: true },
   });
@@ -236,6 +237,7 @@ export async function registerAction(
 
     const user = await prisma.user.create({
       data: {
+        clubId: await requireCurrentClubId(),
         username,
         email,
         ...placeholders,

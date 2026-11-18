@@ -75,7 +75,7 @@ export async function canViewMembersAdmin(user: SessionUser): Promise<boolean> {
 }
 
 async function tennisSectionId(): Promise<string | null> {
-  const tennis = await prisma.section.findUnique({
+  const tennis = await prisma.section.findFirst({
     where: { name: "Tennis" },
     select: { id: true },
   });

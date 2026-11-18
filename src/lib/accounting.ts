@@ -368,9 +368,9 @@ function subscriptionPaymentCreditApplied(
   return 0;
 }
 
-function summarizeCashReconciliation(
+async function summarizeCashReconciliation(
   items: AccountingPayment[],
-): IncomingPaymentBreakdown {
+): Promise<IncomingPaymentBreakdown> {
   const summary: IncomingPaymentBreakdown = {
     stripeCount: 0,
     stripeCents: 0,
@@ -386,7 +386,7 @@ function summarizeCashReconciliation(
     const external = paymentExternalCents(item);
     if (external <= 0) continue;
     if (channel === "stripe") {
-      const { feeCents, estimated } = resolveStripeFeeCents(
+      const { feeCents, estimated } = await resolveStripeFeeCents(
         external,
         item.stripeFeeCents,
       );
@@ -1114,7 +1114,7 @@ export async function loadAccountingReport(
     return true;
   });
   // Einnahmen = Kreditkarte + Überweisung (− bestätigte Rückerstattungen via Filter oben).
-  const incomingByMethod = summarizeCashReconciliation(cashReconciliationItems);
+  const incomingByMethod = await summarizeCashReconciliation(cashReconciliationItems);
   const membershipWindows = new Map<
     string,
     { start: Date; end: Date | null }[]

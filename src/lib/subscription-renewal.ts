@@ -299,8 +299,8 @@ async function renewOnePeriod(
     const stripeFeeCents =
       stripePaymentId != null
         ? (await fetchStripeFeeFromPaymentIntent(stripePaymentId)) ??
-          estimateStripeFeeCents(amount)
-        : estimateStripeFeeCents(amount);
+          (await estimateStripeFeeCents(amount))
+        : await estimateStripeFeeCents(amount);
     await recordSubscriptionPayment({
       subscriptionId: subscription.id,
       amountCents: amount,

@@ -1,11 +1,13 @@
 import { formatIban } from "@/lib/bank-transfer";
+import { decryptSecret } from "@/lib/club-secrets";
+import { usesLegacyEnv, getCurrentClubRecord } from "@/lib/club-settings";
 import { prisma } from "@/lib/prisma";
 import {
   cleanStripeEnv,
   isPlaceholderStripeKey,
   getGlobalStripeSecretKey,
   getGlobalStripeWebhookSecret,
-  getPublicAppUrl,
+  getAppUrl,
   isStripeDemoMode,
 } from "@/lib/stripe";
 
@@ -90,8 +92,27 @@ async function paymentEnvKeyForSection(sectionId: string | null | undefined) {
   return section?.paymentEnvKey ?? null;
 }
 
-export function stripeWebhookEndpointUrl() {
-  return `${getPublicAppUrl()}/api/stripe/webhook`;
+async function legacyPaymentEnv() {
+  const club = await getCurrentClubRecord();
+  if (!club) return true;
+  return usesLegacyEnv(club);
+}
+
+async function storedSectionPayment(sectionId: string) {
+  const row = await prisma.sectionPaymentConfig.findUnique({
+    where: { sectionId },
+  });
+  if (!row) return null;
+  const holder = row.bankAccountHolder.trim();
+  const iban = decryptSecret(row.bankIban).replace(/\s/g, "").toUpperCase();
+  const secret = cleanStripeEnv(decryptSecret(row.stripeSecretKey));
+  const webhook = cleanStripeEnv(decryptSecret(row.stripeWebhookSecret));
+  if (!holder && !iban && !secret && !webhook) return null;
+  return { holder, iban, secret, webhook };
+}
+
+export async function stripeWebhookEndpointUrl() {
+  return `${await getAppUrl()}/api/stripe/webhook`;
 }
 
 /**
@@ -101,8 +122,19 @@ export async function resolveSectionBank(
   sectionId: string | null | undefined,
 ): Promise<SectionBankDetails | null> {
   if (sectionId) {
+    const stored = await storedSectionPayment(sectionId);
+    if (stored && stored.iban.length >= 15 && stored.holder) {
+      return {
+        holder: stored.holder,
+        iban: stored.iban,
+        formattedIban: formatIban(stored.iban),
+        source: "section-env",
+      };
+    }
+    if (!(await legacyPaymentEnv())) return null;
     return sectionBankDetailsFromEnvKey(await paymentEnvKeyForSection(sectionId));
   }
+  if (!(await legacyPaymentEnv())) return null;
   return clubBankDetails();
 }
 
@@ -119,12 +151,16 @@ export async function resolveSectionStripeSecretKey(
   sectionId: string | null | undefined,
 ): Promise<string | null> {
   if (sectionId) {
+    const stored = await storedSectionPayment(sectionId);
+    if (stored?.secret && !isPlaceholderStripeKey(stored.secret)) return stored.secret;
+    if (!(await legacyPaymentEnv())) return null;
     const envKey = await paymentEnvKeyForSection(sectionId);
     if (!envKey) return null;
     const key = cleanStripeEnv(readEnv(paymentEnvVarNames(envKey).stripeSecretKey));
     if (!key || isPlaceholderStripeKey(key)) return null;
     return key;
   }
+  if (!(await legacyPaymentEnv())) return null;
   return getGlobalStripeSecretKey();
 }
 
@@ -132,10 +168,14 @@ export async function resolveSectionStripeWebhookSecret(
   sectionId: string | null | undefined,
 ): Promise<string | null> {
   if (sectionId) {
+    const stored = await storedSectionPayment(sectionId);
+    if (stored?.webhook) return stored.webhook;
+    if (!(await legacyPaymentEnv())) return null;
     const envKey = await paymentEnvKeyForSection(sectionId);
     if (!envKey) return null;
     return cleanStripeEnv(readEnv(paymentEnvVarNames(envKey).stripeWebhookSecret)) || null;
   }
+  if (!(await legacyPaymentEnv())) return null;
   return getGlobalStripeWebhookSecret();
 }
 
@@ -182,7 +222,37 @@ export async function getSectionStripeStatus(
   sectionId: string | null | undefined,
 ): Promise<SectionStripeStatus> {
   if (!sectionId) {
+    if (!(await legacyPaymentEnv())) {
+      return {
+        secretConfigured: false,
+        webhookConfigured: false,
+        checkoutReady: false,
+        fullyReady: false,
+        usingClubFallback: false,
+      };
+    }
     return globalStripeStatus();
+  }
+  const stored = await storedSectionPayment(sectionId);
+  if (stored && (stored.secret || stored.webhook)) {
+    const secretConfigured = Boolean(stored.secret && !isPlaceholderStripeKey(stored.secret));
+    const webhookConfigured = Boolean(stored.webhook);
+    return {
+      secretConfigured,
+      webhookConfigured,
+      checkoutReady: secretConfigured,
+      fullyReady: secretConfigured && webhookConfigured,
+      usingClubFallback: false,
+    };
+  }
+  if (!(await legacyPaymentEnv())) {
+    return {
+      secretConfigured: false,
+      webhookConfigured: false,
+      checkoutReady: false,
+      fullyReady: false,
+      usingClubFallback: false,
+    };
   }
   return sectionStripeStatusFromEnvKey(await paymentEnvKeyForSection(sectionId));
 }
@@ -190,7 +260,7 @@ export async function getSectionStripeStatus(
 export async function isSectionStripeConfigured(
   sectionId: string | null | undefined,
 ) {
-  if (isStripeDemoMode()) return true;
+  if (await isStripeDemoMode()) return true;
   if (
     cleanStripeEnv(process.env.SHOWCASE_MODE) === "1" &&
     getGlobalStripeSecretKey()
@@ -201,11 +271,10 @@ export async function isSectionStripeConfigured(
   return status.checkoutReady;
 }
 
-/** Alle hinterlegten Secret Keys aus dem Render Environment, ohne Duplikate. */
+/** Secret Keys des aktuellen Vereins, sonst (ohne Verein) aller Vereine. */
 export async function listAllStripeSecretKeys(): Promise<string[]> {
   const sections = await prisma.section.findMany({
-    where: { paymentEnvKey: { not: null } },
-    select: { paymentEnvKey: true },
+    select: { id: true, paymentEnvKey: true },
   });
   const keys: string[] = [];
   const seen = new Set<string>();
@@ -216,19 +285,25 @@ export async function listAllStripeSecretKeys(): Promise<string[]> {
     seen.add(key);
     keys.push(key);
   };
+  const legacy = await legacyPaymentEnv();
   for (const section of sections) {
-    if (!section.paymentEnvKey) continue;
-    push(readEnv(paymentEnvVarNames(section.paymentEnvKey).stripeSecretKey));
+    const stored = await storedSectionPayment(section.id);
+    if (stored?.secret) {
+      push(stored.secret);
+      continue;
+    }
+    if (legacy && section.paymentEnvKey) {
+      push(readEnv(paymentEnvVarNames(section.paymentEnvKey).stripeSecretKey));
+    }
   }
-  push(getGlobalStripeSecretKey());
+  if (legacy) push(getGlobalStripeSecretKey());
   return keys;
 }
 
 /** Alle Webhook-Secrets zum Verifizieren eingehender Events. */
 export async function listAllStripeWebhookSecrets(): Promise<string[]> {
   const sections = await prisma.section.findMany({
-    where: { paymentEnvKey: { not: null } },
-    select: { paymentEnvKey: true },
+    select: { id: true, paymentEnvKey: true },
   });
   const secrets: string[] = [];
   const seen = new Set<string>();
@@ -238,10 +313,17 @@ export async function listAllStripeWebhookSecrets(): Promise<string[]> {
     seen.add(secret);
     secrets.push(secret);
   };
+  const legacy = await legacyPaymentEnv();
   for (const section of sections) {
-    if (!section.paymentEnvKey) continue;
-    push(readEnv(paymentEnvVarNames(section.paymentEnvKey).stripeWebhookSecret));
+    const stored = await storedSectionPayment(section.id);
+    if (stored?.webhook) {
+      push(stored.webhook);
+      continue;
+    }
+    if (legacy && section.paymentEnvKey) {
+      push(readEnv(paymentEnvVarNames(section.paymentEnvKey).stripeWebhookSecret));
+    }
   }
-  push(getGlobalStripeWebhookSecret());
+  if (legacy) push(getGlobalStripeWebhookSecret());
   return secrets;
 }

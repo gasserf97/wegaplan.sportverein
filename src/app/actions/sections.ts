@@ -5,6 +5,7 @@ import { z } from "zod";
 import { COURSE_ACCENTS, resolveAccent } from "@/lib/accents";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireCurrentClubId } from "@/lib/tenant";
 import { sectionListOrderBy } from "@/lib/section-order";
 import {
   isValidPaymentEnvKey,
@@ -62,7 +63,7 @@ export async function createSectionAction(
     return sectionError(parsed.error.issues[0]?.message ?? "Ungültiger Name.");
   }
 
-  const existing = await prisma.section.findUnique({
+  const existing = await prisma.section.findFirst({
     where: { name: parsed.data },
   });
   if (existing) {
@@ -72,6 +73,7 @@ export async function createSectionAction(
   const maxOrder = await prisma.section.aggregate({ _max: { sortOrder: true } });
   await prisma.section.create({
     data: {
+      clubId: await requireCurrentClubId(),
       name: parsed.data,
       sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
       accent,

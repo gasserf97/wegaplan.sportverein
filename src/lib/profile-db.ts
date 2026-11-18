@@ -56,7 +56,7 @@ export async function findProfileConflict(input: {
   const [existingEmail, existingTax] = await Promise.all([
     skipEmail
       ? Promise.resolve(null)
-      : prisma.user.findUnique({ where: { email: input.email } }),
+      : prisma.user.findFirst({ where: { email: input.email } }),
     skipTax
       ? Promise.resolve(null)
       : prisma.user.findFirst({ where: { taxId: input.taxId } }),

@@ -296,8 +296,7 @@ export function SectionStripeSetupGuide({ webhookUrl }: { webhookUrl: string }) 
         <li>
           Signing secret (
           <code className="text-xs">whsec_…</code>) und Secret Key mit dem
-          Prefix der jeweiligen Sektion im Render Environment speichern, z. B.{" "}
-          <code className="text-xs">PAYMENT_TENNIS_STRIPE_SECRET_KEY</code>.
+          beim Betreiber in den Vereinseinstellungen dieser Sektion hinterlegen.
         </li>
       </ol>
       <p className="mt-3 text-xs text-muted-foreground">
@@ -347,9 +346,8 @@ export function SectionPaymentsForm({
       <input type="hidden" name="sectionId" value={sectionId} />
       <p className="text-sm font-medium">Zahlungskonto – {sectionName}</p>
       <p className="text-xs text-muted-foreground">
-        Aus Sicherheitsgründen werden IBAN, Stripe Secret Key und Stripe
-        Webhook Secret nicht in der App oder Datenbank gespeichert. Pro Sektion
-        wird nur dieser nicht-geheime Env-Key gespeichert.
+        IBAN und Stripe-Schlüssel pflegt der Betreiber pro Sektion. Hier bleibt
+        nur der optionale Env-Key als Fallback für ältere Installationen.
       </p>
       <div className="grid gap-2 sm:max-w-xs">
         <Label htmlFor={`payment-env-key-${sectionId}`}>Env-Key</Label>
@@ -390,8 +388,8 @@ export function SectionPaymentsForm({
         }
       >
         {bankConfigured && stripeCheckoutReady && stripeWebhookConfigured
-          ? "Render-Zahlungsvariablen sind vollständig gesetzt."
-          : "Bitte fehlende Werte in Render unter Environment ergänzen."}
+          ? "Zahlungsdaten sind hinterlegt."
+          : "Zahlungsdaten fehlen noch in den Vereinseinstellungen des Betreibers."}
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" size="sm" disabled={pending}>

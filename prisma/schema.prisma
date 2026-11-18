@@ -49,9 +49,11 @@ enum PendingRefundKind {
 
 model User {
   id                    String             @id @default(cuid())
-  username              String             @unique
+  username              String
   name                  String
-  email                 String             @unique
+  email                 String
+  clubId                String
+  club                  Club               @relation(fields: [clubId], references: [id], onDelete: Restrict)
   emailVerifiedAt       DateTime?
   emailVerifyToken      String?            @unique
   emailVerifyExpiresAt  DateTime?
@@ -115,6 +117,9 @@ model User {
   clubEventsCreated     ClubEvent[]        @relation("ClubEventCreator")
   clubEventReads        ClubEventRead[]
 
+  @@unique([clubId, username])
+  @@unique([clubId, email])
+  @@index([clubId])
   @@index([managedById])
   @@index([lastLoginAt])
 }
@@ -174,8 +179,10 @@ model CreditTransaction {
 
 model Section {
   id                 String         @id @default(cuid())
-  name               String         @unique
-  paymentEnvKey      String?        @unique
+  clubId             String
+  club               Club           @relation(fields: [clubId], references: [id], onDelete: Restrict)
+  name               String
+  paymentEnvKey      String?
   sortOrder          Int            @default(0)
   /// Kartenfarbe aller Kurse dieser Sektion.
   accent             String         @default("red")
@@ -191,7 +198,11 @@ model Section {
   clubEvents         ClubEventSection[]
   creditAccounts     SectionCreditAccount[]
   creditTransactions CreditTransaction[]
+  paymentConfig      SectionPaymentConfig?
 
+  @@unique([clubId, name])
+  @@unique([clubId, paymentEnvKey])
+  @@index([clubId])
   @@index([sortOrder])
 }
 
@@ -230,6 +241,8 @@ model SectionAdmin {
 
 model Course {
   id                   String        @id @default(cuid())
+  clubId               String
+  club                 Club          @relation(fields: [clubId], references: [id], onDelete: Restrict)
   title                String
   /// Optionaler Name auf Bestätigung (leer = title). Platzhalter {year} = Perioden-/Kursjahr.
   confirmationTitle    String?
@@ -278,6 +291,7 @@ model Course {
   bundledPlan SubscriptionPlan? @relation("CourseBundledPlan", fields: [bundledPlanId], references: [id], onDelete: SetNull)
   enrollments Enrollment[]
 
+  @@index([clubId])
   @@index([bundledPlanId])
 }
 
@@ -345,6 +359,8 @@ model EnrollmentDocument {
 
 model Court {
   id                String             @id @default(cuid())
+  clubId            String
+  club              Club               @relation(fields: [clubId], references: [id], onDelete: Restrict)
   name              String
   category          String             @default("Freiluft")
   sortOrder         Int                @default(0)
@@ -356,6 +372,8 @@ model Court {
   createdAt         DateTime           @default(now())
   section           Section?           @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   reservations      CourtReservation[]
+
+  @@index([clubId])
 }
 
 model CourtReservation {
@@ -399,6 +417,8 @@ enum DevicePricingMode {
 
 model Device {
   id          String               @id @default(cuid())
+  clubId      String
+  club        Club                 @relation(fields: [clubId], references: [id], onDelete: Restrict)
   name        String
   category    String               @default("Fahrzeug")
   sortOrder   Int                  @default(0)
@@ -410,6 +430,8 @@ model Device {
   createdAt   DateTime             @default(now())
   section     Section?             @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   reservations DeviceReservation[]
+
+  @@index([clubId])
 }
 
 model DeviceReservation {
@@ -464,6 +486,8 @@ enum PlanPricingMode {
 
 model SubscriptionPlan {
   id               String                @id @default(cuid())
+  clubId           String
+  club             Club                  @relation(fields: [clubId], references: [id], onDelete: Restrict)
   title            String
   /// Optionaler Name auf Bestätigung (leer = title). Platzhalter {year} = Periodenjahr.
   confirmationTitle String?
@@ -500,6 +524,8 @@ model SubscriptionPlan {
   createdBy        User?                 @relation("PlanCreator", fields: [createdById], references: [id], onDelete: SetNull)
   subscriptions    Subscription[]
   bundledInCourses Course[]              @relation("CourseBundledPlan")
+
+  @@index([clubId])
 }
 
 model Subscription {
@@ -560,6 +586,8 @@ enum SupportTicketStatus {
 
 model SupportTicket {
   id         String               @id @default(cuid())
+  clubId     String
+  club       Club                 @relation(fields: [clubId], references: [id], onDelete: Restrict)
   subject    String
   message    String
   status     SupportTicketStatus  @default(OPEN)
@@ -570,6 +598,7 @@ model SupportTicket {
   closedBy   User?                @relation("TicketClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
   createdAt  DateTime             @default(now())
 
+  @@index([clubId])
   @@index([createdAt])
   @@index([userId])
   @@index([status])
@@ -637,6 +666,8 @@ model PendingRefundTransfer {
 /// Hinweis eines Haupt-Admins (z. B. Sitzung), sichtbar im gewählten Zeitraum.
 model ClubEvent {
   id           String             @id @default(cuid())
+  clubId       String
+  club         Club               @relation(fields: [clubId], references: [id], onDelete: Restrict)
   body         String
   /// Veröffentlichung ab diesem Zeitpunkt (Beginn des Kalendertags, Europe/Rome).
   startsAt     DateTime
@@ -657,6 +688,7 @@ model ClubEvent {
   sections     ClubEventSection[]
   reads        ClubEventRead[]
 
+  @@index([clubId])
   @@index([startsAt, endsAt])
   @@index([createdById])
 }
@@ -688,4 +720,77 @@ model ClubEventRead {
 model SeedMarker {
   key       String   @id
   createdAt DateTime @default(now())
+}
+
+/// Ein Sportverein. Zugang über Subdomain (`slug`) oder zusätzliche Hosts.
+model Club {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  hosts     ClubHost[]
+  settings  ClubSettings?
+  users     User[]
+  sections  Section[]
+  courses   Course[]
+  courts    Court[]
+  devices   Device[]
+  plans     SubscriptionPlan[]
+  tickets   SupportTicket[]
+  events    ClubEvent[]
+}
+
+model ClubHost {
+  id     String @id @default(cuid())
+  clubId String
+  host   String @unique
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@index([clubId])
+}
+
+/// Login nur auf der Hauptdomain, kein Vereinsmitglied.
+model PlatformAdmin {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+/// Vereins-Einstellungen, die früher Environment-Variablen waren.
+/// Geheimnisse (API-Keys, SMTP-Passwort) sind verschlüsselt.
+/// configuredAt leer = beim Verein „lajen“ noch die alten Umgebungsvariablen nutzen.
+model ClubSettings {
+  clubId                    String    @id
+  club                      Club      @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  mailProvider              String    @default("")
+  mailFrom                  String    @default("")
+  brevoApiKey               String    @default("")
+  resendApiKey              String    @default("")
+  smtpHost                  String    @default("")
+  smtpPort                  String    @default("")
+  smtpUser                  String    @default("")
+  smtpPass                  String    @default("")
+  registrationBackupEmail   String    @default("")
+  supportTicketNotifyEmail  String    @default("")
+  stripeFeePercent          String    @default("")
+  stripeFeeFixedCents       String    @default("")
+  showcaseMode              Boolean   @default(false)
+  impressumUrl              String    @default("")
+  configuredAt              DateTime?
+}
+
+model SectionPaymentConfig {
+  sectionId            String  @id
+  section              Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  bankAccountHolder    String  @default("")
+  /// Verschlüsselt.
+  bankIban             String  @default("")
+  /// Verschlüsselt.
+  stripeSecretKey      String  @default("")
+  /// Verschlüsselt.
+  stripeWebhookSecret  String  @default("")
 }

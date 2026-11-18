@@ -2,10 +2,13 @@
 
 import { redirect } from "next/navigation";
 import {
+  clearSessionCookie,
   getSessionImpersonatorId,
+  getSessionPlatformImpersonatorId,
   requireAdmin,
   setSessionCookie,
 } from "@/lib/auth";
+import { platformBaseUrl } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 
 export type ImpersonationState =
@@ -70,6 +73,12 @@ export async function startImpersonationAction(
 }
 
 export async function stopImpersonationAction(): Promise<ImpersonationState> {
+  const platformAdminId = await getSessionPlatformImpersonatorId();
+  if (platformAdminId) {
+    await clearSessionCookie();
+    redirect(`${await platformBaseUrl()}/vereine`);
+  }
+
   const impersonatorId = await getSessionImpersonatorId();
   if (!impersonatorId) {
     return { error: "Keine aktive Simulation." };

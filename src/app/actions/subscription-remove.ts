@@ -195,7 +195,7 @@ export async function removeSubscriptionUserAction(
     latestPayment?.source,
     subscription.paymentMethod,
   );
-  const { payoutCents, feeCents } = cashRefundPayoutCents({
+  const { payoutCents, feeCents } = await cashRefundPayoutCents({
     paymentMethod: refundPaymentMethod,
     externalCents,
     stripeFeeCents: latestPayment?.stripeFeeCents,

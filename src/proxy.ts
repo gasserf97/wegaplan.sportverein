@@ -7,10 +7,29 @@ import {
   sessionCookieSecure,
 } from "@/lib/session-token";
 
+import { hostWithoutPort, isPlatformHost, slugFromHost } from "@/lib/host";
+
 /** Forward pathname so the root layout can enforce the Stammdaten gate. */
 export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-pathname", request.nextUrl.pathname);
+  const host = hostWithoutPort(
+    request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "",
+  );
+  requestHeaders.set("x-club-host", host);
+
+  const path = request.nextUrl.pathname;
+  if (
+    request.method === "GET" &&
+    isPlatformHost(host) &&
+    !path.startsWith("/vereine") &&
+    !path.startsWith("/api")
+  ) {
+    return NextResponse.redirect(new URL("/vereine", request.url));
+  }
+  if (request.method === "GET" && slugFromHost(host) && path.startsWith("/vereine")) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
   const response = NextResponse.next({
     request: { headers: requestHeaders },
   });

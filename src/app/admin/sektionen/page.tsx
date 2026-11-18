@@ -14,8 +14,8 @@ import { getAccent, resolveAccent } from "@/lib/accents";
 import { cn } from "@/lib/utils";
 import { requireAdmin } from "@/lib/auth";
 import {
-  sectionBankDetailsFromEnvKey,
-  sectionStripeStatusFromEnvKey,
+  getSectionStripeStatus,
+  resolveSectionBank,
   stripeWebhookEndpointUrl,
 } from "@/lib/section-payments";
 import { sectionListOrderBy } from "@/lib/section-order";
@@ -34,12 +34,12 @@ export default async function SectionsAdminPage() {
     },
   });
 
-  const webhookUrl = stripeWebhookEndpointUrl();
-  const paymentStatuses = sections.map((section) => ({
+  const webhookUrl = await stripeWebhookEndpointUrl();
+  const paymentStatuses = await Promise.all(sections.map(async (section) => ({
     section,
-    bankConfigured: Boolean(sectionBankDetailsFromEnvKey(section.paymentEnvKey)),
-    stripeStatus: sectionStripeStatusFromEnvKey(section.paymentEnvKey),
-  }));
+    bankConfigured: Boolean(await resolveSectionBank(section.id)),
+    stripeStatus: await getSectionStripeStatus(section.id),
+  })));
   const incompleteStripe = paymentStatuses.filter(
     (item) => !item.stripeStatus.fullyReady,
   );
@@ -52,9 +52,8 @@ export default async function SectionsAdminPage() {
           <h1 className="text-4xl text-primary">Sektionen</h1>
           <p className="mt-2 text-muted-foreground">
             Kurs, Auto und Mitgliedschaft brauchen immer eine Sektion. Die
-            Kartenfarbe gilt für alle Kurse der Sektion. Zahlung: zuerst
-            über die Render-Environment-Variablen, nicht über gespeicherte
-            Sektions-Secrets. Mit ↑/↓ legen Sie die Reihenfolge für Dropdowns fest.
+            Kartenfarbe gilt für alle Kurse der Sektion. Zahlungsdaten trägt der
+            Betreiber in den Vereinseinstellungen ein. Mit ↑/↓ legen Sie die Reihenfolge für Dropdowns fest.
             Sektions-Admins sind Admin-Rechte – keine bezahlte Vereinsmitgliedschaft.
           </p>
         </div>
@@ -68,18 +67,16 @@ export default async function SectionsAdminPage() {
 
       {incompleteStripe.length > 0 ? (
         <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-          Stripe ist im Render Environment unvollständig bei:{" "}
+          Stripe ist unvollständig bei:{" "}
           {incompleteStripe.map((item) => item.section.name).join(", ")}.
-          Bitte die jeweiligen <code className="text-xs">PAYMENT_*</code>
-          Variablen in Render setzen.
+          Der Betreiber trägt die Schlüssel in den Vereinseinstellungen ein.
         </p>
       ) : null}
       {incompleteBank.length > 0 ? (
         <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-          Überweisung ist im Render Environment unvollständig bei:{" "}
+          Überweisung ist unvollständig bei:{" "}
           {incompleteBank.map((item) => item.section.name).join(", ")}.
-          Bitte die jeweiligen <code className="text-xs">PAYMENT_*</code>
-          Variablen in Render setzen.
+          Der Betreiber trägt IBAN und Kontoinhaber in den Vereinseinstellungen ein.
         </p>
       ) : null}
 
@@ -126,10 +123,10 @@ export default async function SectionsAdminPage() {
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Überweisung:{" "}
-                      {bankConfigured ? "Render Env" : "fehlt"}{" "}
+                      {bankConfigured ? "hinterlegt" : "fehlt"}{" "}
                       · Stripe:{" "}
                       {stripeStatus.fullyReady
-                        ? "Render Env"
+                        ? "hinterlegt"
                         : stripeStatus.secretConfigured
                           ? "unvollständig (Webhook fehlt)"
                           : "fehlt"}

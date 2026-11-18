@@ -7,7 +7,8 @@ import {
 } from "@/lib/membership-card-data";
 import { isMailConfigured, mailConfigIssue, sendMail } from "@/lib/mail";
 import { resolveConfirmationDelivery } from "@/lib/notification-email";
-import { getPublicAppUrl } from "@/lib/stripe";
+import { clubDisplayName } from "@/lib/club-settings";
+import { getAppUrl, getPublicAppUrl } from "@/lib/stripe";
 import { ASC_LAJEN } from "@/lib/brand";
 
 function escapeHtml(value: string) {
@@ -18,7 +19,7 @@ function escapeHtml(value: string) {
     .replace(/"/g, "&quot;");
 }
 
-function membershipCardTableHtml(data: MembershipCardData) {
+function membershipCardTableHtml(data: MembershipCardData, clubName: string) {
   const name = escapeHtml(data.name);
   const memberNo = escapeHtml(data.memberNo);
   const plan = escapeHtml(data.planTitle);
@@ -37,7 +38,7 @@ function membershipCardTableHtml(data: MembershipCardData) {
         <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
           <tr>
             <td style="vertical-align:top;padding-right:12px;">
-              <p style="margin:0;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#ffffff;opacity:0.9;font-weight:bold;">ASC Lajen Raiffeisen</p>
+              <p style="margin:0;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#ffffff;opacity:0.9;font-weight:bold;">${escapeHtml(clubName)}</p>
               <p style="margin:6px 0 0;font-size:20px;font-weight:bold;line-height:1.25;color:#ffffff;">${escapeHtml(data.cardTitle)}</p>
             </td>
             <td style="width:42px;vertical-align:top;">
@@ -83,8 +84,9 @@ function membershipCardBlockText(data: MembershipCardData) {
 export function membershipCardEmailHtml(
   cards: MembershipCardData | MembershipCardData[],
   cardUrl: string,
-  options?: { recipientName?: string; intro?: string },
+  options?: { recipientName?: string; intro?: string; clubName?: string },
 ) {
+  const clubName = options?.clubName?.trim() || "Sportverein";
   const list = Array.isArray(cards) ? cards : [cards];
   const greetingName = escapeHtml(
     options?.recipientName?.trim() || list[0]?.name || "",
@@ -103,12 +105,12 @@ export function membershipCardEmailHtml(
   <p style="margin:0 0 20px;font-size:15px;line-height:1.5;">
     ${escapeHtml(introText)}
   </p>
-  ${list.map((data) => membershipCardTableHtml(data)).join("\n")}
+  ${list.map((data) => membershipCardTableHtml(data, clubName)).join("\n")}
   <p style="margin:20px 0 0;font-size:14px;">
     Karte${plural ? "n" : ""} im Konto öffnen oder drucken:<br />
     <a href="${escapeHtml(cardUrl)}" style="color:${ASC_LAJEN.teal};">${escapeHtml(cardUrl)}</a>
   </p>
-  <p style="margin:16px 0 0;font-size:13px;color:#666;">ASC Lajen Raiffeisen</p>
+  <p style="margin:16px 0 0;font-size:13px;color:#666;">${escapeHtml(clubName)}</p>
 </body>
 </html>`;
 }
@@ -116,8 +118,9 @@ export function membershipCardEmailHtml(
 export function membershipCardEmailText(
   cards: MembershipCardData | MembershipCardData[],
   cardUrl: string,
-  options?: { recipientName?: string },
+  options?: { recipientName?: string; clubName?: string },
 ) {
+  const clubName = options?.clubName?.trim() || "Sportverein";
   const list = Array.isArray(cards) ? cards : [cards];
   const greetingName = options?.recipientName?.trim() || list[0]?.name || "";
   const plural = list.length > 1;
@@ -133,7 +136,7 @@ ${list.map((data) => membershipCardBlockText(data)).join("\n\n---\n\n")}
 
 Karte${plural ? "n" : ""} öffnen: ${cardUrl}
 
-ASC Lajen Raiffeisen`;
+${clubName}`;
 }
 
 export type MembershipCardSendResult =
@@ -203,9 +206,9 @@ async function sendMembershipCardGroup(
     return { sent: false, message: "Keine Vereinsmitgliedschaft gefunden." };
   }
 
-  if (!isMailConfigured()) {
+  if (!(await isMailConfigured())) {
     const message =
-      mailConfigIssue() ??
+      (await mailConfigIssue()) ??
       "E-Mail-Versand ist nicht konfiguriert (SMTP in Render setzen).";
     console.error(
       "Mitgliedskarte E-Mail",
@@ -239,18 +242,21 @@ async function sendMembershipCardGroup(
       periodEnd: row.periodEnd,
     }),
   );
-  const cardUrl = `${getPublicAppUrl()}/konto/mitgliedskarte`;
+  const clubName = await clubDisplayName();
+  const cardUrl = `${await getAppUrl()}/konto/mitgliedskarte`;
   const html = membershipCardEmailHtml(cards, cardUrl, {
     recipientName: primary.greetingName,
+    clubName,
   });
   const text = membershipCardEmailText(cards, cardUrl, {
     recipientName: primary.greetingName,
+    clubName,
   });
   const names = [...new Set(cards.map((card) => card.name))].join(", ");
   const subject =
     cards.length > 1
-      ? `Vereinsmitgliedschaften für ${names} – ASC Lajen`
-      : `Vereinsmitgliedschaft für ${names} – ASC Lajen`;
+      ? `Vereinsmitgliedschaften für ${names} – ${clubName}`
+      : `Vereinsmitgliedschaft für ${names} – ${clubName}`;
 
   try {
     const result = await sendMail({

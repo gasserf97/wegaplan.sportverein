@@ -26,7 +26,7 @@ export default async function StripeTestCheckoutPage({
 }: {
   searchParams: Promise<{ session_id?: string; error?: string }>;
 }) {
-  if (!isStripeDemoMode()) {
+  if (!(await isStripeDemoMode())) {
     redirect("/");
   }
 

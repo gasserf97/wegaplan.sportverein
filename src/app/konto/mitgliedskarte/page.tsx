@@ -8,6 +8,7 @@ import {
 import { PrintMembershipCardButton } from "@/components/print-membership-card-button";
 import { ResendMembershipCardButton } from "@/components/resend-membership-card-button";
 import { getCurrentUser } from "@/lib/auth";
+import { clubDisplayName } from "@/lib/club-settings";
 import { listFamily } from "@/lib/family";
 import { getServerI18n } from "@/lib/i18n";
 import { isMailConfigured, mailConfigIssue } from "@/lib/mail";
@@ -20,12 +21,13 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function MembershipCardPage() {
   const { t } = await getServerI18n();
+  const clubName = await clubDisplayName();
   const user = await getCurrentUser();
   if (!user) redirect("/anmelden?next=/konto/mitgliedskarte");
 
   const family = await listFamily(user.id);
-  const mailReady = isMailConfigured();
-  const mailIssue = mailConfigIssue();
+  const mailReady = await isMailConfigured();
+  const mailIssue = await mailConfigIssue();
   const cards = await prisma.subscription.findMany({
     where: {
       userId: { in: family.map((person) => person.id) },
@@ -70,6 +72,7 @@ export default async function MembershipCardPage() {
           {cards.map((item) => (
             <li key={item.id} className="print:break-inside-avoid space-y-3">
               <MembershipCardView
+                clubName={clubName}
                 data={toCardData({
                   userId: item.user.id,
                   name: item.user.name,

@@ -9,8 +9,10 @@ import {
 
 export function MembershipCardView({
   data,
+  clubName = "Sportverein",
 }: {
   data: MembershipCardData;
+  clubName?: string;
 }) {
   return (
     <article
@@ -25,7 +27,7 @@ export function MembershipCardView({
       <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3">
         <div>
           <p className="text-[11px] font-semibold tracking-[0.18em] uppercase opacity-90">
-            ASC Lajen Raiffeisen
+            {clubName}
           </p>
           <h2 className="mt-1 font-heading text-xl leading-tight sm:text-2xl">
             {data.cardTitle}

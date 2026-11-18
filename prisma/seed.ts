@@ -11,6 +11,21 @@ function daysFromNow(offsetDays: number, hourUtc = 17) {
 const SEED_EXAMPLES_MARKER = "examples-initialized";
 
 async function main() {
+  const club = await prisma.club.upsert({
+    where: { slug: "lajen" },
+    update: { name: "ASC Lajen Raiffeisen" },
+    create: {
+      id: "club_lajen",
+      name: "ASC Lajen Raiffeisen",
+      slug: "lajen",
+      hosts: {
+        create: { id: "host_app_asclajen", host: "app.asclajen.com" },
+      },
+      settings: { create: { impressumUrl: "https://asclajen.com/impressum" } },
+    },
+  });
+  const clubId = club.id;
+
   const marker = await prisma.seedMarker.findUnique({
     where: { key: SEED_EXAMPLES_MARKER },
   });
@@ -34,7 +49,7 @@ async function main() {
   const annaHash = await hash("Anna1234", 10);
 
   const admin = await prisma.user.upsert({
-    where: { username: "admin" },
+    where: { clubId_username: { clubId, username: "admin" } },
     update: {
       passwordHash: adminHash,
       role: "ADMIN",
@@ -49,6 +64,7 @@ async function main() {
       emailVerifiedAt: new Date(),
     },
     create: {
+      clubId,
       username: "admin",
       name: "Klara Leitner",
       email: "klara.leitner@example.com",
@@ -65,7 +81,7 @@ async function main() {
   });
 
   const max = await prisma.user.upsert({
-    where: { username: "max" },
+    where: { clubId_username: { clubId, username: "max" } },
     update: {
       passwordHash: userHash,
       role: "USER",
@@ -80,6 +96,7 @@ async function main() {
       emailVerifiedAt: new Date(),
     },
     create: {
+      clubId,
       username: "max",
       name: "Max Berger",
       email: "max@example.com",
@@ -95,8 +112,8 @@ async function main() {
     },
   });
 
-  const existingDennis = await prisma.user.findUnique({ where: { username: "dennis" } });
-  const existingTennisUser = await prisma.user.findUnique({ where: { username: "tennis" } });
+  const existingDennis = await prisma.user.findUnique({ where: { clubId_username: { clubId, username: "dennis" } } });
+  const existingTennisUser = await prisma.user.findUnique({ where: { clubId_username: { clubId, username: "tennis" } } });
   if (existingDennis && !existingTennisUser) {
     await prisma.user.update({
       where: { id: existingDennis.id },
@@ -109,7 +126,7 @@ async function main() {
   }
 
   const tennisAdmin = await prisma.user.upsert({
-    where: { username: "tennis" },
+    where: { clubId_username: { clubId, username: "tennis" } },
     update: {
       passwordHash: tennisHash,
       name: "Lena Gruber",
@@ -123,6 +140,7 @@ async function main() {
       emailVerifiedAt: new Date(),
     },
     create: {
+      clubId,
       username: "tennis",
       name: "Lena Gruber",
       email: "lena.gruber@example.com",
@@ -147,9 +165,9 @@ async function main() {
   for (let index = 0; index < sectionNames.length; index += 1) {
     const { name, accent } = sectionNames[index];
     const section = await prisma.section.upsert({
-      where: { name },
+      where: { clubId_name: { clubId, name } },
       update: { sortOrder: index },
-      create: { name, sortOrder: index, accent },
+      create: { clubId, name, sortOrder: index, accent },
     });
     sections.push(section);
   }
@@ -158,7 +176,7 @@ async function main() {
   const freizeitSection = sections.find((s) => s.name === "Freizeit Aktiv")!;
   let tennisSection = sections.find((s) => s.name === "Tennis")!;
 
-  const dennisSection = await prisma.section.findUnique({ where: { name: "Dennis" } });
+  const dennisSection = await prisma.section.findFirst({ where: { clubId, name: "Dennis" } });
   if (dennisSection && tennisSection && dennisSection.id !== tennisSection.id) {
     await prisma.course.updateMany({
       where: { sectionId: dennisSection.id },
@@ -420,7 +438,7 @@ async function main() {
     await prisma.course.upsert({
       where: { id },
       update: data,
-      create: { id, ...data },
+      create: { id, clubId, ...data },
     });
   }
 
@@ -537,7 +555,7 @@ async function main() {
     await prisma.subscriptionPlan.upsert({
       where: { id },
       update: data,
-      create: { id, ...data },
+      create: { id, clubId, ...data },
     });
   }
 
@@ -636,7 +654,7 @@ async function main() {
   });
 
   const anna = await prisma.user.upsert({
-    where: { username: "anna" },
+    where: { clubId_username: { clubId, username: "anna" } },
     update: {
       passwordHash: annaHash,
       role: "USER",
@@ -651,6 +669,7 @@ async function main() {
       emailVerifiedAt: new Date(),
     },
     create: {
+      clubId,
       username: "anna",
       name: "Anna Holzer",
       email: "anna.holzer@example.com",
@@ -667,7 +686,7 @@ async function main() {
   });
 
   const footballAdmin = await prisma.user.upsert({
-    where: { username: "fussball" },
+    where: { clubId_username: { clubId, username: "fussball" } },
     update: {
       passwordHash: footballHash,
       role: "USER",
@@ -683,6 +702,7 @@ async function main() {
       canBookDevices: true,
     },
     create: {
+      clubId,
       username: "fussball",
       name: "Paul Senoner",
       email: "paul.senoner@example.com",
@@ -700,7 +720,7 @@ async function main() {
   });
 
   const mia = await prisma.user.upsert({
-    where: { username: "mia" },
+    where: { clubId_username: { clubId, username: "mia" } },
     update: {
       name: "Mia Berger",
       email: "mia.berger@example.com",
@@ -715,6 +735,7 @@ async function main() {
       emailVerifiedAt: new Date(),
     },
     create: {
+      clubId,
       username: "mia",
       name: "Mia Berger",
       email: "mia.berger@example.com",
@@ -880,10 +901,10 @@ async function main() {
   if ((await prisma.court.count()) === 0) {
     await prisma.court.createMany({
       data: [
-        { id: "platz-1", name: "Platz 1", category: "Freiluft", sortOrder: 1, priceCentsPerHour: 1500, sectionId: tennisSection.id },
-        { id: "platz-2", name: "Platz 2", category: "Freiluft", sortOrder: 2, priceCentsPerHour: 1500, sectionId: tennisSection.id },
-        { id: "platz-3", name: "Platz 3", category: "Freiluft", sortOrder: 3, priceCentsPerHour: 1500, sectionId: tennisSection.id },
-        { id: "platz-halle", name: "Halle", category: "Halle", sortOrder: 4, priceCentsPerHour: 2000, sectionId: tennisSection.id },
+        { id: "platz-1", clubId, name: "Platz 1", category: "Freiluft", sortOrder: 1, priceCentsPerHour: 1500, sectionId: tennisSection.id },
+        { id: "platz-2", clubId, name: "Platz 2", category: "Freiluft", sortOrder: 2, priceCentsPerHour: 1500, sectionId: tennisSection.id },
+        { id: "platz-3", clubId, name: "Platz 3", category: "Freiluft", sortOrder: 3, priceCentsPerHour: 1500, sectionId: tennisSection.id },
+        { id: "platz-halle", clubId, name: "Halle", category: "Halle", sortOrder: 4, priceCentsPerHour: 2000, sectionId: tennisSection.id },
       ],
     });
   }
@@ -893,6 +914,7 @@ async function main() {
       data: [
         {
           id: "auto-1",
+          clubId,
           name: "Vereinsauto 1",
           category: "Fahrzeug",
           sortOrder: 1,
@@ -901,6 +923,7 @@ async function main() {
         },
         {
           id: "auto-2",
+          clubId,
           name: "Vereinsauto 2",
           category: "Fahrzeug",
           sortOrder: 2,
@@ -997,6 +1020,7 @@ async function main() {
     },
     create: {
       id: "demo-event-abend",
+      clubId,
       body: "Beispiel: Vereinsabend in der Turnhalle. Alle Mitglieder sind eingeladen, Anmeldung ist nicht nötig.",
       startsAt: daysFromNow(-1, 0),
       endsAt: daysFromNow(21, 22),

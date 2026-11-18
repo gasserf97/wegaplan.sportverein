@@ -10,6 +10,7 @@ import { formChecked, formText } from "@/lib/form-draft";
 import { parseEuroToCents } from "@/lib/format";
 import { canManageCourse, canManageSection } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { requireCurrentClubId } from "@/lib/tenant";
 import { bundledMembershipPlanError } from "@/lib/course-bundled-plan";
 import { parseClock } from "@/lib/course-schedule";
 import { sectionListOrderBy } from "@/lib/section-order";
@@ -449,6 +450,7 @@ export async function createCourseAction(
 
   await prisma.course.create({
     data: {
+      clubId: await requireCurrentClubId(),
       ...parsed.data,
       bundledPlanId: bundled.bundledPlanId,
       allowWithoutMembership: withoutMembership.allowWithoutMembership,

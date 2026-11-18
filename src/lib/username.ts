@@ -37,7 +37,7 @@ export async function allocateUniqueUsername(base: string): Promise<string> {
         ? normalized
         : `${normalized.slice(0, 24)}${i.toString(36)}`.slice(0, 32);
     if (candidate.length < 3) continue;
-    const existing = await prisma.user.findUnique({
+    const existing = await prisma.user.findFirst({
       where: { username: candidate },
       select: { id: true },
     });

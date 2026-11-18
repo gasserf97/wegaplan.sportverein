@@ -5,6 +5,7 @@ import {
   loadCourseCalendarEvents,
   loadCourtCalendarEvents,
 } from "@/lib/calendar-feed";
+import { clubDisplayName } from "@/lib/club-settings";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -42,7 +43,7 @@ async function resolveFeed(tokenParam: string) {
         })),
       ].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())
     : [];
-  return buildCalendarIcs(events);
+  return buildCalendarIcs(events, new Date(), await clubDisplayName());
 }
 
 export async function HEAD(
