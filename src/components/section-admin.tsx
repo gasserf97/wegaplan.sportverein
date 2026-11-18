@@ -64,34 +64,32 @@ export function SectionCreateForm() {
         : "section";
 
   return (
-    <form
-      key={formKey}
-      action={formAction}
-      className="flex flex-col gap-3 sm:flex-row sm:items-end"
-    >
-      <div className="grid flex-1 gap-2">
-        <Label htmlFor="name">Neue Sektion</Label>
-        <Input
-          id="name"
-          name="name"
-          defaultValue={draft?.name}
-          required
-          minLength={2}
-          maxLength={80}
-        />
+    <form key={formKey} action={formAction} className="grid gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="grid min-w-48 flex-1 gap-2">
+          <Label htmlFor="name">Neue Sektion</Label>
+          <Input
+            id="name"
+            name="name"
+            defaultValue={draft?.name}
+            required
+            minLength={2}
+            maxLength={80}
+          />
+        </div>
+        <div className="grid shrink-0 gap-2">
+          <Label htmlFor="accent">Kartenfarbe</Label>
+          <AccentSelect id="accent" name="accent" defaultValue={draft?.accent} />
+        </div>
+        <Button type="submit" disabled={pending}>
+          {pending ? "Anlegen…" : "Sektion anlegen"}
+        </Button>
       </div>
-      <div className="grid gap-2">
-        <Label htmlFor="accent">Kartenfarbe</Label>
-        <AccentSelect id="accent" name="accent" defaultValue={draft?.accent} />
-      </div>
-      <Button type="submit" disabled={pending}>
-        {pending ? "Anlegen…" : "Sektion anlegen"}
-      </Button>
       {state && "error" in state ? (
-        <p className="w-full text-sm text-destructive sm:col-span-2">{state.error}</p>
+        <p className="text-sm text-destructive">{state.error}</p>
       ) : null}
       {state && "ok" in state ? (
-        <p className="w-full text-sm text-primary sm:col-span-2">Sektion angelegt.</p>
+        <p className="text-sm text-primary">Sektion angelegt.</p>
       ) : null}
     </form>
   );
