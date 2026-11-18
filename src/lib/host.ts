@@ -2,6 +2,11 @@ export function hostWithoutPort(value: string) {
   return value.trim().toLowerCase().replace(/:\d+$/, "");
 }
 
+/** Ersten Host aus ggf. kommasepariertem Header nehmen. */
+export function normalizeHostHeader(value: string) {
+  return hostWithoutPort((value.split(",")[0] ?? "").trim());
+}
+
 function hostFromUrl(value: string | undefined) {
   if (!value?.trim()) return "";
   try {
@@ -16,8 +21,11 @@ function hostFromUrl(value: string | undefined) {
  * (damit wegaplan.onrender.com ohne Extra-Env als Super-Admin funktioniert).
  */
 export function platformDomain() {
-  const configured = hostWithoutPort(process.env.PLATFORM_DOMAIN ?? "");
-  if (configured) return configured;
+  const configured = normalizeHostHeader(process.env.PLATFORM_DOMAIN ?? "");
+  if (configured) {
+    // Falls jemand https://… einträgt
+    return hostFromUrl(configured) || configured;
+  }
   const fromRender = hostWithoutPort(process.env.RENDER_EXTERNAL_HOSTNAME ?? "");
   if (fromRender) return fromRender;
   return (
@@ -26,8 +34,14 @@ export function platformDomain() {
   );
 }
 
+/** Render-*.onrender.com erlaubt keine Wildcard-Subdomains. */
+export function supportsClubSubdomains(domain = platformDomain()) {
+  if (!domain) return true;
+  return !domain.endsWith(".onrender.com") && domain !== "onrender.com";
+}
+
 export function isPlatformHost(host: string) {
-  const name = hostWithoutPort(host);
+  const name = normalizeHostHeader(host);
   if (name === "localhost" || name === "127.0.0.1") return true;
   const domain = platformDomain();
   if (!domain) return false;
@@ -36,7 +50,7 @@ export function isPlatformHost(host: string) {
 
 /** Subdomain vor der Plattform-Domain oder `slug.localhost`. */
 export function slugFromHost(host: string): string | null {
-  const name = hostWithoutPort(host);
+  const name = normalizeHostHeader(host);
   if (name.endsWith(".localhost")) {
     const slug = name.slice(0, -".localhost".length);
     if (slug && !slug.includes(".")) return slug;
@@ -50,3 +64,7 @@ export function slugFromHost(host: string): string | null {
   if (!slug || slug.includes(".") || slug === "www") return null;
   return slug;
 }
+
+/** Cookie + Header: Verein auf der Hauptdomain testen, ohne Subdomain. */
+export const CLUB_PREVIEW_COOKIE = "club_preview";
+export const CLUB_PREVIEW_HEADER = "x-club-preview";

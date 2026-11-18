@@ -1,7 +1,7 @@
 import { platformLoginAction, platformLogoutAction, createClubAction, openClubAdminAction } from "@/app/actions/platform";
 import { ensurePlatformAdmin, getPlatformAdmin } from "@/lib/platform-auth";
 import { prisma } from "@/lib/prisma";
-import { clubPublicUrl, requestHostHeader } from "@/lib/tenant";
+import { clubPublicUrlLabel, requestHostHeader, supportsClubSubdomains } from "@/lib/tenant";
 import { PlatformForm } from "@/components/platform-form";
 
 export const dynamic = "force-dynamic";
@@ -75,7 +75,7 @@ export default async function ClubsPage() {
                   ) : null}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {clubPublicUrl(club.slug, host)} · {club._count.users} Benutzer
+                  {clubPublicUrlLabel(club.slug, host)} · {club._count.users} Benutzer
                 </p>
                 {club.hosts.length > 0 ? (
                   <p className="text-xs text-muted-foreground">
@@ -107,7 +107,10 @@ export default async function ClubsPage() {
       <section className="rounded-xl border border-border bg-card p-5">
         <h2 className="text-2xl">Neuen Verein anlegen</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Subdomain und der erste Haupt-Admin. Zahlungen und Mail pflegen Sie danach in den Einstellungen.
+          Slug und der erste Haupt-Admin. Zahlungen und Mail pflegen Sie danach in den Einstellungen.
+          {!supportsClubSubdomains()
+            ? " Ohne eigene Domain läuft die Vereins-App vorerst als Vorschau auf dieser Host-Adresse (Als Admin öffnen)."
+            : null}
         </p>
         <div className="mt-4">
           <PlatformForm

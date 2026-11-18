@@ -1,10 +1,13 @@
 import { cache } from "react";
 import { headers } from "next/headers";
 import {
+  CLUB_PREVIEW_HEADER,
   hostWithoutPort,
   isPlatformHost,
+  normalizeHostHeader,
   platformDomain,
   slugFromHost,
+  supportsClubSubdomains,
 } from "@/lib/host";
 import {
   currentClubId,
@@ -13,14 +16,22 @@ import {
 } from "@/lib/tenant-context";
 
 export { currentClubId, runWithClub };
-export { hostWithoutPort, isPlatformHost, platformDomain, slugFromHost };
+export {
+  hostWithoutPort,
+  isPlatformHost,
+  platformDomain,
+  slugFromHost,
+  supportsClubSubdomains,
+};
 
 const LAJEN_SLUG = "lajen";
 const hostCache = new Map<string, { at: number; clubId: string | null }>();
+const slugCache = new Map<string, { at: number; clubId: string | null }>();
 const HOST_CACHE_MS = 5_000;
 
 export function clearClubHostCache() {
   hostCache.clear();
+  slugCache.clear();
 }
 
 export type RequestHost =
@@ -28,8 +39,25 @@ export type RequestHost =
   | { kind: "club"; host: string; clubId: string; slug: string; name: string }
   | { kind: "unknown"; host: string };
 
+async function lookupClubBySlug(slug: string) {
+  const key = slug.trim().toLowerCase();
+  if (!key) return null;
+  const cached = slugCache.get(key);
+  if (cached && Date.now() - cached.at < HOST_CACHE_MS) {
+    return cached.clubId;
+  }
+  const { prisma } = await import("@/lib/prisma");
+  const club = await prisma.club.findUnique({
+    where: { slug: key },
+    select: { id: true, active: true },
+  });
+  const clubId = club?.active ? club.id : null;
+  slugCache.set(key, { at: Date.now(), clubId });
+  return clubId;
+}
+
 async function lookupClub(host: string) {
-  const name = hostWithoutPort(host);
+  const name = normalizeHostHeader(host);
   const cached = hostCache.get(name);
   if (cached && Date.now() - cached.at < HOST_CACHE_MS) {
     return cached.clubId;
@@ -45,17 +73,19 @@ async function lookupClub(host: string) {
   }
   const slug = slugFromHost(name);
   if (slug) {
-    const club = await prisma.club.findUnique({
-      where: { slug },
-      select: { id: true, active: true },
-    });
-    if (club?.active) {
-      hostCache.set(name, { at: Date.now(), clubId: club.id });
-      return club.id;
-    }
+    const clubId = await lookupClubBySlug(slug);
+    hostCache.set(name, { at: Date.now(), clubId });
+    return clubId;
   }
   hostCache.set(name, { at: Date.now(), clubId: null });
   return null;
+}
+
+async function previewSlugFromHeaders() {
+  const headerList = await headers();
+  const raw = headerList.get(CLUB_PREVIEW_HEADER)?.trim().toLowerCase() ?? "";
+  if (!raw || raw.includes(".") || raw.includes("/")) return null;
+  return raw;
 }
 
 setClubRequestResolver(async () => {
@@ -65,13 +95,18 @@ setClubRequestResolver(async () => {
     headerList.get("x-forwarded-host") ||
     headerList.get("host") ||
     "";
-  if (!host || isPlatformHost(host)) return null;
+  if (!host) return null;
+  if (isPlatformHost(host)) {
+    const preview = await previewSlugFromHeaders();
+    if (!preview) return null;
+    return lookupClubBySlug(preview);
+  }
   return lookupClub(host);
 });
 
 export async function requestHostHeader() {
   const headerList = await headers();
-  return hostWithoutPort(
+  return normalizeHostHeader(
     headerList.get("x-club-host") ||
       headerList.get("x-forwarded-host") ||
       headerList.get("host") ||
@@ -81,7 +116,32 @@ export async function requestHostHeader() {
 
 export const resolveRequestHost = cache(async (): Promise<RequestHost> => {
   const host = await requestHostHeader();
-  if (!host || isPlatformHost(host)) return { kind: "platform", host };
+  if (!host) return { kind: "unknown", host: "" };
+
+  if (isPlatformHost(host)) {
+    const preview = await previewSlugFromHeaders();
+    if (preview) {
+      const clubId = await lookupClubBySlug(preview);
+      if (clubId) {
+        const { prisma } = await import("@/lib/prisma");
+        const club = await prisma.club.findUnique({
+          where: { id: clubId },
+          select: { id: true, slug: true, name: true },
+        });
+        if (club) {
+          return {
+            kind: "club",
+            host,
+            clubId: club.id,
+            slug: club.slug,
+            name: club.name,
+          };
+        }
+      }
+    }
+    return { kind: "platform", host };
+  }
+
   const clubId = await lookupClub(host);
   if (!clubId) return { kind: "unknown", host };
   const { prisma } = await import("@/lib/prisma");
@@ -117,7 +177,19 @@ export function clubPublicUrl(slug: string, requestHost?: string) {
     const withPort = port || "4521";
     return `http://${slug}.localhost:${withPort}`;
   }
+  if (!supportsClubSubdomains(domain)) {
+    // Ohne Wildcard (z. B. *.onrender.com): gleiche Host-Vorschau.
+    return `https://${domain}`;
+  }
   return `https://${slug}.${domain}`;
+}
+
+export function clubPublicUrlLabel(slug: string, requestHost?: string) {
+  const url = clubPublicUrl(slug, requestHost);
+  if (!supportsClubSubdomains()) {
+    return `${url} (Vorschau: ${slug})`;
+  }
+  return url;
 }
 
 export async function platformBaseUrl() {

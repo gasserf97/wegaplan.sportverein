@@ -11,7 +11,13 @@ import {
   setPlatformSession,
 } from "@/lib/platform-auth";
 import { prisma } from "@/lib/prisma";
-import { clearClubHostCache, clubPublicUrl, requestHostHeader } from "@/lib/tenant";
+import { supportsClubSubdomains } from "@/lib/host";
+import {
+  clearClubHostCache,
+  clubPublicUrl,
+  platformBaseUrl,
+  requestHostHeader,
+} from "@/lib/tenant";
 
 export type PlatformState = { error: string } | null;
 
@@ -124,8 +130,12 @@ export async function openClubAdminAction(clubId: string) {
     platformAdminId: actor.id,
   });
   const host = await requestHostHeader();
-  const url = new URL("/api/platform/enter", clubPublicUrl(club.slug, host));
+  const base = supportsClubSubdomains()
+    ? clubPublicUrl(club.slug, host)
+    : await platformBaseUrl();
+  const url = new URL("/api/platform/enter", base);
   url.searchParams.set("token", token);
+  url.searchParams.set("club", club.slug);
   redirect(url.toString());
 }
 
