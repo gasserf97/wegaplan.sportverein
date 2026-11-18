@@ -62,7 +62,12 @@ export default async function ClubSettingsPage({
             ]}
             fields={[
               { name: "name", label: "Name", defaultValue: club.name },
-              { name: "slug", label: "Subdomain", defaultValue: club.slug },
+              {
+                name: "slug",
+                label: "Subdomain",
+                defaultValue: club.slug,
+                hint: "nur a–z, Umlaute werden zu ae/oe/ue",
+              },
               {
                 name: "hosts",
                 label: "Zusätzliche Hosts",

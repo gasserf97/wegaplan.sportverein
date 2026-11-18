@@ -33,6 +33,20 @@ export type PlatformState = { error: string } | null;
 
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 
+/** DNS-tauglich: Umlaute → ae/oe/ue, sonst nur a-z, 0-9, Bindestrich. */
+function normalizeSlug(raw: string) {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function keepSecret(next: string, previous: string, clear: boolean) {
   if (clear) return "";
   const value = next.trim();
@@ -71,7 +85,7 @@ export async function createClubAction(
   if (!actor) return { error: "Bitte anmelden." };
 
   const name = String(formData.get("name") ?? "").trim();
-  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const slug = normalizeSlug(String(formData.get("slug") ?? ""));
   const adminName = String(formData.get("adminName") ?? "").trim();
   const adminEmail = String(formData.get("adminEmail") ?? "").trim().toLowerCase();
   const adminUsername = String(formData.get("adminUsername") ?? "").trim().toLowerCase();
@@ -79,7 +93,10 @@ export async function createClubAction(
 
   if (name.length < 2) return { error: "Bitte einen Vereinsnamen angeben." };
   if (!SLUG.test(slug)) {
-    return { error: "Subdomain: Kleinbuchstaben, Zahlen und Bindestrich." };
+    return {
+      error:
+        "Subdomain: nur a–z, 0–9 und Bindestrich (z. B. voellan statt völlan).",
+    };
   }
   if (adminName.length < 2 || !adminEmail.includes("@") || adminUsername.length < 3) {
     return { error: "Bitte den ersten Admin vollständig angeben." };
@@ -170,9 +187,14 @@ export async function saveClubSettingsAction(
   if (!club || !club.settings) return { error: "Verein nicht gefunden." };
 
   const name = String(formData.get("name") ?? "").trim();
-  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const slug = normalizeSlug(String(formData.get("slug") ?? ""));
   if (name.length < 2) return { error: "Name fehlt." };
-  if (!SLUG.test(slug)) return { error: "Subdomain ungültig." };
+  if (!SLUG.test(slug)) {
+    return {
+      error:
+        "Subdomain: nur a–z, 0–9 und Bindestrich (z. B. voellan statt völlan).",
+    };
+  }
   if (slug !== club.slug) {
     const taken = await prisma.club.findUnique({ where: { slug }, select: { id: true } });
     if (taken) return { error: "Diese Subdomain ist schon vergeben." };

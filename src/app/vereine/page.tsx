@@ -118,7 +118,11 @@ export default async function ClubsPage() {
             submitLabel="Verein anlegen"
             fields={[
               { name: "name", label: "Vereinsname" },
-              { name: "slug", label: "Subdomain", hint: "z. B. lajen" },
+              {
+                name: "slug",
+                label: "Subdomain",
+                hint: "nur a–z, z. B. voellan (aus völlan)",
+              },
               { name: "adminName", label: "Name des ersten Admins" },
               { name: "adminEmail", label: "E-Mail des Admins", type: "email" },
               { name: "adminUsername", label: "Benutzername des Admins" },
