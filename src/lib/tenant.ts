@@ -194,12 +194,15 @@ export function clubPublicUrlLabel(slug: string, requestHost?: string) {
 
 export async function platformBaseUrl() {
   const domain = platformDomain();
-  const host = await requestHostHeader().catch(() => "");
-  const port = host.includes(":") ? host.split(":").pop() : "";
-  if (!domain) {
-    return `http://127.0.0.1:${port || "4521"}`;
+  if (domain && domain !== "0.0.0.0") {
+    return `https://${domain}`;
   }
-  return `https://${domain}`;
+  const host = await requestHostHeader().catch(() => "");
+  const normalized = normalizeHostHeader(host);
+  const port = host.includes(":") ? host.split(":").pop() : "";
+  const localPort =
+    port && port !== "10000" && normalized !== "0.0.0.0" ? port : "4521";
+  return `http://127.0.0.1:${localPort}`;
 }
 
 export const LAJEN_CLUB_SLUG = LAJEN_SLUG;

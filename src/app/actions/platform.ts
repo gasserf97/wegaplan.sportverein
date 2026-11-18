@@ -11,13 +11,23 @@ import {
   setPlatformSession,
 } from "@/lib/platform-auth";
 import { prisma } from "@/lib/prisma";
-import { supportsClubSubdomains } from "@/lib/host";
+import { platformDomain, supportsClubSubdomains } from "@/lib/host";
 import {
   clearClubHostCache,
   clubPublicUrl,
   platformBaseUrl,
   requestHostHeader,
 } from "@/lib/tenant";
+
+function isUsablePublicOrigin(value: string) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    return host !== "0.0.0.0" && host !== "::" && host !== "[::]";
+  } catch {
+    return false;
+  }
+}
 
 export type PlatformState = { error: string } | null;
 
@@ -130,10 +140,16 @@ export async function openClubAdminAction(clubId: string) {
     platformAdminId: actor.id,
   });
   const host = await requestHostHeader();
-  const base = supportsClubSubdomains()
+  // Same-Host-Vorschau auf der Plattform-URL; mit Subdomain auf {slug}.{domain}.
+  // Nie Render-Bind-Adresse 0.0.0.0:10000 verwenden.
+  const preferred = supportsClubSubdomains()
     ? clubPublicUrl(club.slug, host)
     : await platformBaseUrl();
-  const url = new URL("/api/platform/enter", base);
+  const fallbackDomain = platformDomain() || "wegaplan.onrender.com";
+  const origin = isUsablePublicOrigin(preferred)
+    ? preferred
+    : `https://${fallbackDomain}`;
+  const url = new URL("/api/platform/enter", origin);
   url.searchParams.set("token", token);
   url.searchParams.set("club", club.slug);
   redirect(url.toString());

@@ -7,6 +7,11 @@ export function normalizeHostHeader(value: string) {
   return hostWithoutPort((value.split(",")[0] ?? "").trim());
 }
 
+function isBindOnlyHostname(host: string) {
+  const name = normalizeHostHeader(host);
+  return name === "0.0.0.0" || name === "::" || name === "[::]";
+}
+
 function hostFromUrl(value: string | undefined) {
   if (!value?.trim()) return "";
   try {
@@ -22,16 +27,81 @@ function hostFromUrl(value: string | undefined) {
  */
 export function platformDomain() {
   const configured = normalizeHostHeader(process.env.PLATFORM_DOMAIN ?? "");
-  if (configured) {
+  if (configured && !isBindOnlyHostname(configured)) {
     // Falls jemand https://… einträgt
     return hostFromUrl(configured) || configured;
   }
   const fromRender = hostWithoutPort(process.env.RENDER_EXTERNAL_HOSTNAME ?? "");
-  if (fromRender) return fromRender;
-  return (
+  if (fromRender && !isBindOnlyHostname(fromRender)) return fromRender;
+  const fromUrl =
     hostFromUrl(process.env.NEXT_PUBLIC_APP_URL) ||
-    hostFromUrl(process.env.RENDER_EXTERNAL_URL)
-  );
+    hostFromUrl(process.env.RENDER_EXTERNAL_URL);
+  if (fromUrl && !isBindOnlyHostname(fromUrl)) return fromUrl;
+  return "";
+}
+
+/**
+ * Öffentliche Origin für Redirects.
+ * Auf Render ist request.url oft http://0.0.0.0:10000/ – das darf nie in Location stehen.
+ */
+export function publicOriginFromRequest(request: Request) {
+  const forwardedHost =
+    request.headers.get("x-forwarded-host") ||
+    request.headers.get("x-club-host") ||
+    "";
+  const hostHeader = request.headers.get("host") || "";
+  const hostCandidate = [forwardedHost, hostHeader]
+    .map((value) => (value.split(",")[0] ?? "").trim())
+    .find((value) => value && !isBindOnlyHostname(value));
+
+  const protoHeader = (
+    request.headers.get("x-forwarded-proto") || ""
+  )
+    .split(",")[0]
+    ?.trim()
+    .toLowerCase();
+
+  if (hostCandidate) {
+    const host = hostCandidate.toLowerCase();
+    const isLocal =
+      normalizeHostHeader(host) === "localhost" ||
+      normalizeHostHeader(host) === "127.0.0.1" ||
+      normalizeHostHeader(host).endsWith(".localhost");
+    const proto =
+      protoHeader === "http" || protoHeader === "https"
+        ? protoHeader
+        : isLocal
+          ? "http"
+          : "https";
+    return `${proto}://${host}`;
+  }
+
+  const domain = platformDomain();
+  if (domain) return `https://${domain}`;
+
+  const fromEnv =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.RENDER_EXTERNAL_URL?.trim() ||
+    "";
+  if (fromEnv) {
+    try {
+      return new URL(fromEnv).origin;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  try {
+    const fallback = new URL(request.url);
+    if (!isBindOnlyHostname(fallback.hostname)) return fallback.origin;
+  } catch {
+    /* ignore */
+  }
+  return "http://127.0.0.1:4521";
+}
+
+export function publicUrlFromRequest(request: Request, pathname: string) {
+  return new URL(pathname, `${publicOriginFromRequest(request)}/`);
 }
 
 /** Render-*.onrender.com erlaubt keine Wildcard-Subdomains. */

@@ -12,6 +12,7 @@ import {
   CLUB_PREVIEW_HEADER,
   isPlatformHost,
   normalizeHostHeader,
+  publicUrlFromRequest,
   slugFromHost,
 } from "@/lib/host";
 
@@ -54,10 +55,10 @@ export async function proxy(request: NextRequest) {
     !path.startsWith("/vereine") &&
     !path.startsWith("/api")
   ) {
-    return NextResponse.redirect(new URL("/vereine", request.url));
+    return NextResponse.redirect(publicUrlFromRequest(request, "/vereine"));
   }
   if (request.method === "GET" && slugFromHost(host) && path.startsWith("/vereine")) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return NextResponse.redirect(publicUrlFromRequest(request, "/"));
   }
   const response = NextResponse.next({
     request: { headers: requestHeaders },

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { setSessionCookie } from "@/lib/auth";
 import {
   CLUB_PREVIEW_COOKIE,
+  publicUrlFromRequest,
   supportsClubSubdomains,
 } from "@/lib/host";
 import { readPlatformEnterToken } from "@/lib/platform-auth";
@@ -39,7 +40,11 @@ export async function GET(request: Request) {
   }
 
   const requestedSlug = (url.searchParams.get("club") ?? "").trim().toLowerCase();
-  const hostSlug = slugFromHost(url.host);
+  const forwardedHost =
+    request.headers.get("x-forwarded-host") ||
+    request.headers.get("host") ||
+    url.host;
+  const hostSlug = slugFromHost(forwardedHost);
 
   if (requestedSlug && requestedSlug !== user.club.slug) {
     return new Response("Admin gehört nicht zu diesem Verein", { status: 403 });
@@ -63,7 +68,7 @@ export async function GET(request: Request) {
     { platformImpersonatorId: claims.platformAdminId },
   );
 
-  const response = NextResponse.redirect(new URL("/", request.url));
+  const response = NextResponse.redirect(publicUrlFromRequest(request, "/"));
   // Same-Host-Vorschau (z. B. wegaplan.onrender.com) braucht den Cookie.
   if (!supportsClubSubdomains() || requestedSlug) {
     response.cookies.set(CLUB_PREVIEW_COOKIE, user.club.slug, {
