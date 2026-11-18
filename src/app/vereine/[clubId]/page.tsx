@@ -1,21 +1,29 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { saveClubSettingsAction, saveSectionPaymentAction } from "@/app/actions/platform";
+import {
+  resendClubAdminInviteAction,
+  saveClubSettingsAction,
+  saveSectionPaymentAction,
+} from "@/app/actions/platform";
 import { PlatformForm } from "@/components/platform-form";
 import { decryptSecret } from "@/lib/club-secrets";
 import { getPlatformAdmin } from "@/lib/platform-auth";
 import { prisma } from "@/lib/prisma";
+import { runWithClub } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClubSettingsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ clubId: string }>;
+  searchParams: Promise<{ invite?: string }>;
 }) {
   const admin = await getPlatformAdmin();
   if (!admin) redirect("/vereine");
   const { clubId } = await params;
+  const { invite } = await searchParams;
   const club = await prisma.club.findUnique({
     where: { id: clubId },
     include: {
@@ -30,6 +38,20 @@ export default async function ClubSettingsPage({
   if (!club || !club.settings) notFound();
   const settings = club.settings;
   const save = saveClubSettingsAction.bind(null, club.id);
+  const firstAdmin = await runWithClub(club.id, () =>
+    prisma.user.findFirst({
+      where: { role: "ADMIN", canLogin: true },
+      orderBy: { createdAt: "asc" },
+      select: {
+        email: true,
+        emailVerifiedAt: true,
+        emailVerifyToken: true,
+      },
+    }),
+  );
+  const invitePending = Boolean(
+    firstAdmin && (!firstAdmin.emailVerifiedAt || firstAdmin.emailVerifyToken),
+  );
 
   return (
     <main className="mx-auto grid w-full max-w-3xl gap-10 px-4 py-12">
@@ -41,7 +63,37 @@ export default async function ClubSettingsPage({
         <p className="mt-2 text-sm text-muted-foreground">
           Diese Werte gelten nur für diesen Verein. Leere Geheimnis-Felder bleiben unverändert.
         </p>
+        {invite === "sent" ? (
+          <p className="mt-3 text-sm text-primary">
+            Einladungs-E-Mail wurde erneut gesendet
+            {firstAdmin?.email ? ` an ${firstAdmin.email}` : ""}.
+          </p>
+        ) : null}
+        {invite === "error" ? (
+          <p className="mt-3 text-sm text-destructive">
+            Einladung konnte nicht gesendet werden. Bitte Mail-Einstellungen prüfen
+            (Brevo/Resend/SMTP) und erneut versuchen.
+          </p>
+        ) : null}
       </div>
+
+      {invitePending && firstAdmin ? (
+        <section className="rounded-xl border border-border bg-card p-5">
+          <h2 className="text-2xl">Admin-Einladung</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {firstAdmin.email} hat die Registrierung noch nicht abgeschlossen. Bei Bedarf den
+            Bestätigungslink erneut senden (wie bei der normalen Registrierung).
+          </p>
+          <form action={resendClubAdminInviteAction.bind(null, club.id)} className="mt-4">
+            <button
+              type="submit"
+              className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm text-primary-foreground"
+            >
+              Einladung erneut senden
+            </button>
+          </form>
+        </section>
+      ) : null}
 
       <section className="rounded-xl border border-border bg-card p-5">
         <h2 className="text-2xl">Verein und Versand</h2>

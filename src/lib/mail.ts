@@ -579,13 +579,21 @@ export async function passwordResetLink(token: string, nextPath?: string) {
   return `${appUrl}/passwort-zuruecksetzen?${params.toString()}`;
 }
 
-export async function verificationLink(token: string, nextPath?: string) {
+export async function verificationLink(
+  token: string,
+  nextPath?: string,
+  clubSlug?: string,
+) {
   const { getAppUrl } = await import("@/lib/stripe");
   const appUrl = await getAppUrl();
   const params = new URLSearchParams();
   params.set("token", token);
   if (nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")) {
     params.set("next", nextPath);
+  }
+  const slug = clubSlug?.trim().toLowerCase() ?? "";
+  if (slug && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+    params.set("club", slug);
   }
   // Query-Param: JWT enthält Punkte – im Pfad oft problematisch für Mail-Tracker.
   return `${appUrl}/bestaetigen?${params.toString()}`;

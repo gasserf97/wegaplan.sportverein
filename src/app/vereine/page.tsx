@@ -107,7 +107,9 @@ export default async function ClubsPage() {
       <section className="rounded-xl border border-border bg-card p-5">
         <h2 className="text-2xl">Neuen Verein anlegen</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Slug und der erste Haupt-Admin. Zahlungen und Mail pflegen Sie danach in den Einstellungen.
+          Slug und E-Mail des ersten Admins. Der Admin erhält wie bei der normalen
+          Registrierung einen Bestätigungslink und setzt danach selbst Passwort und Stammdaten.
+          Zahlungen und Mail pflegen Sie in den Einstellungen.
           {!supportsClubSubdomains()
             ? " Ohne eigene Domain läuft die Vereins-App vorerst als Vorschau auf dieser Host-Adresse (Als Admin öffnen)."
             : null}
@@ -123,10 +125,12 @@ export default async function ClubsPage() {
                 label: "Subdomain",
                 hint: "nur a–z, z. B. voellan (aus völlan)",
               },
-              { name: "adminName", label: "Name des ersten Admins" },
-              { name: "adminEmail", label: "E-Mail des Admins", type: "email" },
-              { name: "adminUsername", label: "Benutzername des Admins" },
-              { name: "adminPassword", label: "Passwort", type: "password" },
+              {
+                name: "adminEmail",
+                label: "E-Mail des ersten Admins",
+                type: "email",
+                hint: "Bestätigungscode / Link wie bei der Registrierung",
+              },
             ]}
           />
         </div>

@@ -34,12 +34,28 @@ export type MailEnvOverlay = {
   SMTP_PASS: string;
 };
 
-/** null = Prozess-Umgebung nutzen (Legacy oder kein Verein). */
+function clubMailConfigured(settings: {
+  mailProvider: string;
+  brevoApiKey: string;
+  resendApiKey: string;
+  smtpHost: string;
+} | null) {
+  if (!settings) return false;
+  const provider = settings.mailProvider.trim().toLowerCase();
+  if (!provider) return false;
+  if (provider === "brevo") return Boolean(decryptSecret(settings.brevoApiKey));
+  if (provider === "resend") return Boolean(decryptSecret(settings.resendApiKey));
+  if (provider === "smtp") return Boolean(settings.smtpHost.trim());
+  return false;
+}
+
+/** null = Prozess-Umgebung nutzen (Legacy, kein Verein, oder Mail noch nicht am Verein). */
 export async function mailEnvOverlay(): Promise<MailEnvOverlay | null> {
   const club = await getCurrentClubRecord();
   if (!club) return null;
   if (usesLegacyEnv(club)) return null;
   const settings = club.settings;
+  if (!clubMailConfigured(settings)) return null;
   return {
     MAIL_PROVIDER: settings?.mailProvider ?? "",
     MAIL_FROM: settings?.mailFrom ?? "",

@@ -94,6 +94,7 @@ async function issueLink(
   email: string,
   nextPath: string | undefined,
   send: (confirmUrl: string) => Promise<{ sent: boolean; message?: string }>,
+  clubSlug?: string,
 ): Promise<EmailVerificationResult> {
   const token = await createVerifyJwt(userId);
   // Merker für UI/Admin: offener Bestätigungslink (kein Lookup mehr darüber).
@@ -105,7 +106,7 @@ async function issueLink(
     },
   });
 
-  const confirmUrl = await verificationLink(token, nextPath);
+  const confirmUrl = await verificationLink(token, nextPath, clubSlug);
   const delivery = await send(confirmUrl);
   if (delivery.sent) {
     return { email, confirmUrl, sent: true };
@@ -121,6 +122,7 @@ async function issueLink(
 export async function issueEmailVerification(
   userId: string,
   nextPath?: string,
+  options?: { clubSlug?: string },
 ): Promise<EmailVerificationResult> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -128,8 +130,12 @@ export async function issueEmailVerification(
   });
   if (!user) throw new Error("Benutzer nicht gefunden.");
 
-  const result = await issueLink(userId, user.email, nextPath, (url) =>
-    sendVerificationEmail(user.email, url),
+  const result = await issueLink(
+    userId,
+    user.email,
+    nextPath,
+    (url) => sendVerificationEmail(user.email, url),
+    options?.clubSlug,
   );
   if (!result.sent) {
     console.error("Bestätigungsmail", user.email, result.error);
@@ -141,6 +147,7 @@ export async function issueEmailVerification(
 export async function issueAccountInvite(
   userId: string,
   nextPath?: string,
+  options?: { clubSlug?: string },
 ): Promise<EmailVerificationResult> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -148,8 +155,12 @@ export async function issueAccountInvite(
   });
   if (!user) throw new Error("Benutzer nicht gefunden.");
 
-  const result = await issueLink(userId, user.email, nextPath, (url) =>
-    sendAccountInviteEmail(user.email, user.name, url),
+  const result = await issueLink(
+    userId,
+    user.email,
+    nextPath,
+    (url) => sendAccountInviteEmail(user.email, user.name, url),
+    options?.clubSlug,
   );
   if (!result.sent) {
     console.error("Einladungsmail", user.email, result.error);

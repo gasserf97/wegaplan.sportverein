@@ -16,6 +16,13 @@ import {
   slugFromHost,
 } from "@/lib/host";
 
+function clubSlugFromQuery(request: NextRequest) {
+  const raw = request.nextUrl.searchParams.get("club")?.trim().toLowerCase() ?? "";
+  if (!raw || raw.includes(".") || raw.includes("/")) return "";
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(raw)) return "";
+  return raw;
+}
+
 /** Forward pathname so the root layout can enforce the Stammdaten gate. */
 export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
@@ -25,13 +32,22 @@ export async function proxy(request: NextRequest) {
   );
   requestHeaders.set("x-club-host", host);
 
-  const preview = request.cookies.get(CLUB_PREVIEW_COOKIE)?.value?.trim().toLowerCase() ?? "";
-  if (preview && !preview.includes(".") && !preview.includes("/")) {
-    requestHeaders.set(CLUB_PREVIEW_HEADER, preview);
-  }
-
   const path = request.nextUrl.pathname;
   const onPlatform = isPlatformHost(host);
+  const queryClub =
+    path.startsWith("/bestaetigen") || path.startsWith("/passwort-zuruecksetzen")
+      ? clubSlugFromQuery(request)
+      : "";
+  const cookiePreview =
+    request.cookies.get(CLUB_PREVIEW_COOKIE)?.value?.trim().toLowerCase() ?? "";
+  const preview =
+    queryClub ||
+    (cookiePreview && !cookiePreview.includes(".") && !cookiePreview.includes("/")
+      ? cookiePreview
+      : "");
+  if (preview) {
+    requestHeaders.set(CLUB_PREVIEW_HEADER, preview);
+  }
 
   if (request.method === "GET" && onPlatform && path.startsWith("/vereine")) {
     const response = NextResponse.next({
@@ -63,6 +79,15 @@ export async function proxy(request: NextRequest) {
   const response = NextResponse.next({
     request: { headers: requestHeaders },
   });
+  if (queryClub) {
+    response.cookies.set(CLUB_PREVIEW_COOKIE, queryClub, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      secure: sessionCookieSecure(),
+      maxAge: 60 * 60 * 12,
+    });
+  }
   return withSessionRenewal(request, response);
 }
 

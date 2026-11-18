@@ -1,8 +1,10 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { hash } from "bcryptjs";
 import { redirect } from "next/navigation";
 import { encryptSecret } from "@/lib/club-secrets";
+import { issueEmailVerification } from "@/lib/email-verification";
 import {
   clearPlatformSession,
   createPlatformEnterToken,
@@ -11,13 +13,19 @@ import {
   setPlatformSession,
 } from "@/lib/platform-auth";
 import { prisma } from "@/lib/prisma";
+import { incompleteProfilePlaceholders } from "@/lib/profile";
 import { platformDomain, supportsClubSubdomains } from "@/lib/host";
 import {
   clearClubHostCache,
   clubPublicUrl,
   platformBaseUrl,
   requestHostHeader,
+  runWithClub,
 } from "@/lib/tenant";
+import {
+  allocateUniqueUsername,
+  usernameCandidateFromEmail,
+} from "@/lib/username";
 
 function isUsablePublicOrigin(value: string) {
   try {
@@ -86,10 +94,7 @@ export async function createClubAction(
 
   const name = String(formData.get("name") ?? "").trim();
   const slug = normalizeSlug(String(formData.get("slug") ?? ""));
-  const adminName = String(formData.get("adminName") ?? "").trim();
   const adminEmail = String(formData.get("adminEmail") ?? "").trim().toLowerCase();
-  const adminUsername = String(formData.get("adminUsername") ?? "").trim().toLowerCase();
-  const adminPassword = String(formData.get("adminPassword") ?? "");
 
   if (name.length < 2) return { error: "Bitte einen Vereinsnamen angeben." };
   if (!SLUG.test(slug)) {
@@ -98,44 +103,124 @@ export async function createClubAction(
         "Subdomain: nur a–z, 0–9 und Bindestrich (z. B. voellan statt völlan).",
     };
   }
-  if (adminName.length < 2 || !adminEmail.includes("@") || adminUsername.length < 3) {
-    return { error: "Bitte den ersten Admin vollständig angeben." };
+  if (!adminEmail.includes("@") || adminEmail.length < 5) {
+    return { error: "Bitte die E-Mail des ersten Admins angeben." };
   }
-  if (adminPassword.length < 8) return { error: "Passwort mindestens 8 Zeichen." };
 
   const taken = await prisma.club.findUnique({ where: { slug }, select: { id: true } });
   if (taken) return { error: "Diese Subdomain ist schon vergeben." };
 
+  let clubId = "";
   try {
-    await prisma.club.create({
+    const club = await prisma.club.create({
       data: {
         name,
         slug,
         settings: {
-          create: { configuredAt: new Date(), impressumUrl: "" },
-        },
-        users: {
-          create: {
-            username: adminUsername,
-            name: adminName,
-            email: adminEmail,
-            phone: "",
-            taxId: `pending-${slug}`,
-            birthDate: new Date("1990-01-01T12:00:00.000Z"),
-            passwordHash: await hash(adminPassword, 10),
-            role: "ADMIN",
-            emailVerifiedAt: new Date(),
-            canLogin: true,
-          },
+          create: { impressumUrl: "" },
         },
       },
+      select: { id: true },
     });
+    clubId = club.id;
+
+    const inviteError = await runWithClub(club.id, async () => {
+      const username = await allocateUniqueUsername(
+        usernameCandidateFromEmail(adminEmail),
+      );
+      const placeholders = incompleteProfilePlaceholders(
+        randomBytes(8).toString("hex"),
+      );
+      const user = await prisma.user.create({
+        data: {
+          clubId: club.id,
+          username,
+          email: adminEmail,
+          ...placeholders,
+          passwordHash: await hash(randomBytes(32).toString("hex"), 10),
+          role: "ADMIN",
+          canLogin: true,
+          emailVerifiedAt: null,
+        },
+        select: { id: true },
+      });
+      const issued = await issueEmailVerification(user.id, "/konto/familie", {
+        clubSlug: slug,
+      });
+      if (!issued.sent) {
+        return (
+          issued.error ??
+          "Bestätigungs-E-Mail konnte nicht gesendet werden. Bitte Mail am Verein prüfen und Einladung erneut senden."
+        );
+      }
+      return null;
+    });
+
+    if (inviteError) {
+      clearClubHostCache();
+      return {
+        error: `Verein wurde angelegt, aber die Einladung an ${adminEmail} schlug fehl: ${inviteError}`,
+      };
+    }
   } catch {
-    return { error: "Verein konnte nicht angelegt werden. Benutzername oder E-Mail ist in diesem Verein schon belegt." };
+    if (clubId) {
+      try {
+        await prisma.club.delete({ where: { id: clubId } });
+      } catch {
+        /* ignore cleanup */
+      }
+    }
+    return {
+      error:
+        "Verein konnte nicht angelegt werden. Die E-Mail ist in diesem Verein vielleicht schon belegt.",
+    };
   }
 
   clearClubHostCache();
   redirect("/vereine");
+}
+
+export async function resendClubAdminInviteAction(clubId: string) {
+  const actor = await requirePlatform();
+  if (!actor) redirect("/vereine");
+  const club = await prisma.club.findUnique({
+    where: { id: clubId },
+    select: { id: true, slug: true },
+  });
+  if (!club) redirect("/vereine");
+
+  const result = await runWithClub(club.id, async () => {
+    const admin = await prisma.user.findFirst({
+      where: { role: "ADMIN", canLogin: true },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        email: true,
+        emailVerifiedAt: true,
+        emailVerifyToken: true,
+      },
+    });
+    if (!admin) return { error: "Kein Admin in diesem Verein." };
+    if (admin.emailVerifiedAt && !admin.emailVerifyToken) {
+      return { error: "Der Admin hat die Registrierung bereits abgeschlossen." };
+    }
+    const issued = await issueEmailVerification(admin.id, "/konto/familie", {
+      clubSlug: club.slug,
+    });
+    if (!issued.sent) {
+      return {
+        error:
+          issued.error ??
+          "Bestätigungs-E-Mail konnte nicht gesendet werden.",
+      };
+    }
+    return { ok: true as const, email: admin.email };
+  });
+
+  if ("error" in result) {
+    redirect(`/vereine/${clubId}?invite=error`);
+  }
+  redirect(`/vereine/${clubId}?invite=sent`);
 }
 
 export async function openClubAdminAction(clubId: string) {
