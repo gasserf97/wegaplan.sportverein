@@ -29,7 +29,7 @@ function membershipCardTableHtml(data: MembershipCardData) {
     ),
   );
   const born = escapeHtml(formatBirthDate(data.birthDate));
-  const logoUrl = `${getPublicAppUrl()}/asc-logo-icon.png`;
+  const logoUrl = `${getPublicAppUrl()}/api/club/logo`;
 
   return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:380px;margin:0 0 16px;border-collapse:separate;border-spacing:0;border-radius:16px;overflow:hidden;background:linear-gradient(160deg, ${ASC_LAJEN.red} 0%, ${ASC_LAJEN.navy} 55%, ${ASC_LAJEN.green} 100%);">
     <tr>

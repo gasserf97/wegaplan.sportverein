@@ -6,8 +6,10 @@ import { useI18n } from "@/components/locale-provider";
 
 export function SiteFooter({
   reserveTabBar = false,
+  clubLogoUrl = null,
 }: {
   reserveTabBar?: boolean;
+  clubLogoUrl?: string | null;
 }) {
   const { t } = useI18n();
 
@@ -16,7 +18,7 @@ export function SiteFooter({
       <div className="mx-auto hidden w-full max-w-6xl flex-col gap-4 px-4 py-8 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 md:flex">
         <div className="flex items-center gap-3">
           <span className="rounded-md bg-white p-1.5">
-            <ClubLogo variant="icon" href={null} className="size-10" />
+            <ClubLogo variant="icon" href={null} src={clubLogoUrl} className="size-10" />
           </span>
           <div>
             <p className="font-heading font-semibold text-white">
