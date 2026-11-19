@@ -28,6 +28,7 @@ export const it = {
     adminSubscriptions: "Abbonamenti",
     adminAccounting: "Contabilità",
     adminMembers: "Membri",
+    adminClub: "Società",
     adminSections: "Sezioni",
     adminCourts: "Campi da tennis",
     adminFleet: "Parco veicoli",

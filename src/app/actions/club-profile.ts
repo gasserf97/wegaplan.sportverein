@@ -11,7 +11,7 @@ export type ClubLogoState = { error: string } | { ok: true } | null;
 
 function revalidateClubLogo() {
   revalidatePath("/", "layout");
-  revalidatePath("/admin/sektionen");
+  revalidatePath("/admin/verein");
 }
 
 function logoFileFromForm(formData: FormData) {
