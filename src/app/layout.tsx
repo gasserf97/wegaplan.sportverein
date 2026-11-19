@@ -71,12 +71,15 @@ export default async function RootLayout({
 }) {
   const host = await resolveRequestHost();
   if (host.kind === "platform") {
+    const locale = await getLocale();
     return (
       <html
-        lang={localeToIntlTag(await getLocale())}
+        lang={localeToIntlTag(locale)}
         className={`${geistSans.variable} ${montserrat.variable} h-full antialiased`}
       >
-        <body className="min-h-full bg-background text-foreground">{children}</body>
+        <body className="min-h-full bg-background text-foreground">
+          <LocaleProvider locale={locale}>{children}</LocaleProvider>
+        </body>
       </html>
     );
   }
