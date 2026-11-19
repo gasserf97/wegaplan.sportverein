@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
-import { ASC_CLUB, ASC_LAJEN } from "@/lib/brand";
+import { ASC_LAJEN } from "@/lib/brand";
+import { getClubBrand } from "@/lib/club-brand";
 import { readPublicAsset } from "@/lib/public-asset";
 
 export type CourseConfirmationLetterInput = {
@@ -134,12 +135,13 @@ export async function buildCoursePaymentConfirmationPdf(
     .filter(Boolean)
     .join(" ");
 
+  const brand = await getClubBrand();
   const pdf = await PDFDocument.create();
   pdf.setTitle(`Einzahlungsbestätigung ${input.courseTitle}`);
-  pdf.setAuthor(ASC_CLUB.name);
+  pdf.setAuthor(brand.name);
   pdf.setSubject("Einzahlungsbestätigung");
-  pdf.setCreator(ASC_CLUB.name);
-  pdf.setProducer(ASC_CLUB.name);
+  pdf.setCreator(brand.name);
+  pdf.setProducer(brand.name);
   pdf.setLanguage("de-IT");
   pdf.setCreationDate(input.paidAt);
   pdf.setModificationDate(new Date());
@@ -147,7 +149,7 @@ export async function buildCoursePaymentConfirmationPdf(
   const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
   const regular = await pdf.embedFont(StandardFonts.TimesRoman);
   const bold = await pdf.embedFont(StandardFonts.TimesRomanBold);
-  const red = hexRgb(ASC_LAJEN.red);
+  const red = hexRgb(brand.colorPrimary);
   const dark = hexRgb(ASC_LAJEN.dark);
   const muted = rgb(0.33, 0.33, 0.33);
 
@@ -179,38 +181,48 @@ export async function buildCoursePaymentConfirmationPdf(
     });
   };
 
-  drawCentered(ASC_CLUB.namePrimary, bold, 16, red);
+  drawCentered(brand.namePrimary, bold, 16, red);
   y -= 18;
-  drawCentered(ASC_CLUB.nameSecondary, bold, 14);
-  y -= 20;
-  page.drawText(winAnsi(ASC_CLUB.street), {
-    x:
-      (PAGE_WIDTH - regular.widthOfTextAtSize(winAnsi(ASC_CLUB.street), 10)) /
-      2,
-    y,
-    size: 10,
-    font: regular,
-    color: dark,
-  });
-  y -= 13;
-  const cityLine = `${ASC_CLUB.postalCode} ${ASC_CLUB.city}`;
-  page.drawText(winAnsi(cityLine), {
-    x: (PAGE_WIDTH - regular.widthOfTextAtSize(winAnsi(cityLine), 10)) / 2,
-    y,
-    size: 10,
-    font: regular,
-    color: dark,
-  });
-  y -= 13;
-  const taxLine = `Steuernummer ${ASC_CLUB.taxId}`;
-  page.drawText(winAnsi(taxLine), {
-    x: (PAGE_WIDTH - regular.widthOfTextAtSize(winAnsi(taxLine), 10)) / 2,
-    y,
-    size: 10,
-    font: regular,
-    color: dark,
-  });
-  y -= 16;
+  if (brand.nameSecondary) {
+    drawCentered(brand.nameSecondary, bold, 14);
+    y -= 20;
+  }
+  if (brand.street) {
+    page.drawText(winAnsi(brand.street), {
+      x:
+        (PAGE_WIDTH - regular.widthOfTextAtSize(winAnsi(brand.street), 10)) /
+        2,
+      y,
+      size: 10,
+      font: regular,
+      color: dark,
+    });
+    y -= 13;
+  }
+  const cityLine = [brand.postalCode, brand.city].filter(Boolean).join(" ");
+  if (cityLine) {
+    page.drawText(winAnsi(cityLine), {
+      x: (PAGE_WIDTH - regular.widthOfTextAtSize(winAnsi(cityLine), 10)) / 2,
+      y,
+      size: 10,
+      font: regular,
+      color: dark,
+    });
+    y -= 13;
+  }
+  if (brand.taxId) {
+    const taxLine = `Steuernummer ${brand.taxId}`;
+    page.drawText(winAnsi(taxLine), {
+      x: (PAGE_WIDTH - regular.widthOfTextAtSize(winAnsi(taxLine), 10)) / 2,
+      y,
+      size: 10,
+      font: regular,
+      color: dark,
+    });
+    y -= 16;
+  } else {
+    y -= 3;
+  }
 
   page.drawLine({
     start: { x: MARGIN, y },
@@ -247,7 +259,12 @@ export async function buildCoursePaymentConfirmationPdf(
   drawCentered("EINZAHLUNGSBESTÄTIGUNG", bold, 14);
   y -= 28;
 
-  const body = `Der unterfertigte ${ASC_CLUB.president}, in seiner Eigenschaft als Präsident des ${ASC_CLUB.name}, mit Sitz in ${ASC_CLUB.postalCode} ${ASC_CLUB.city}, bestätigt dass ${input.memberName}, ${input.memberTaxId} an folgendem Programm des ${ASC_CLUB.name} teilgenommen hat:`;
+  const seat = [brand.postalCode, brand.city].filter(Boolean).join(" ");
+  const signer = brand.president
+    ? `Der unterfertigte ${brand.president}`
+    : "Der unterfertigte Präsident";
+  const seatPhrase = seat ? `mit Sitz in ${seat}, ` : "";
+  const body = `${signer}, in seiner Eigenschaft als Präsident des ${brand.name}, ${seatPhrase}bestätigt dass ${input.memberName}, ${input.memberTaxId} an folgendem Programm des ${brand.name} teilgenommen hat:`;
   for (const line of wrapLines(body, regular, 11, CONTENT_WIDTH)) {
     page.drawText(winAnsi(line), {
       x: MARGIN,
@@ -272,7 +289,7 @@ export async function buildCoursePaymentConfirmationPdf(
   }
 
   y -= 8;
-  const amountText = `Der Gesamtbetrag von ${amount} Euro wurde ordnungsgemäß überwiesen und ist auf das Konto des ${ASC_CLUB.name} eingegangen.`;
+  const amountText = `Der Gesamtbetrag von ${amount} Euro wurde ordnungsgemäß überwiesen und ist auf das Konto des ${brand.name} eingegangen.`;
   for (const line of wrapLines(amountText, regular, 11, CONTENT_WIDTH)) {
     page.drawText(winAnsi(line), {
       x: MARGIN,
@@ -285,7 +302,7 @@ export async function buildCoursePaymentConfirmationPdf(
   }
 
   y -= 18;
-  page.drawText(winAnsi(`${ASC_CLUB.city}, den ${letterDate}`), {
+  page.drawText(winAnsi(brand.city ? `${brand.city}, den ${letterDate}` : `den ${letterDate}`), {
     x: MARGIN,
     y,
     size: 11,
@@ -338,11 +355,12 @@ function hexRgb(hex: string) {
   );
 }
 
-export function buildCourseConfirmationMailCopy(input: {
+export async function buildCourseConfirmationMailCopy(input: {
   recipientName: string;
   items: Array<{ memberName: string; courseTitle: string }>;
   context?: "course" | "subscription";
 }) {
+  const brand = await getClubBrand();
   const greeting = `Guten Tag ${input.recipientName},`;
   const isSubscription = input.context === "subscription";
   const items = input.items.length > 0 ? input.items : [];
@@ -360,16 +378,16 @@ export function buildCourseConfirmationMailCopy(input: {
         : `im Anhang finden Sie die Einzahlungsbestätigung für ${item.memberName} zum Kurs "${item.courseTitle}".`;
     } else {
       introText = isSubscription
-        ? `vielen Dank für Ihre Buchung des Angebots "${item.courseTitle}" beim ${ASC_CLUB.name}.`
-        : `vielen Dank für Ihre Anmeldung zum Kurs "${item.courseTitle}" beim ${ASC_CLUB.name}.`;
+        ? `vielen Dank für Ihre Buchung des Angebots "${item.courseTitle}" beim ${brand.name}.`
+        : `vielen Dank für Ihre Anmeldung zum Kurs "${item.courseTitle}" beim ${brand.name}.`;
     }
     introHtml = escapeHtml(introText);
     attachmentLine =
       "Die Einzahlungsbestätigung liegt dieser E-Mail als PDF-Datei bei.";
   } else {
     const lead = isSubscription
-      ? `vielen Dank für Ihre Buchungen beim ${ASC_CLUB.name}. Im Anhang finden Sie die Einzahlungsbestätigungen für:`
-      : `vielen Dank für Ihre Anmeldungen beim ${ASC_CLUB.name}. Im Anhang finden Sie die Einzahlungsbestätigungen für:`;
+      ? `vielen Dank für Ihre Buchungen beim ${brand.name}. Im Anhang finden Sie die Einzahlungsbestätigungen für:`
+      : `vielen Dank für Ihre Anmeldungen beim ${brand.name}. Im Anhang finden Sie die Einzahlungsbestätigungen für:`;
     const listText = items
       .map((item) => `• ${item.memberName}: ${item.courseTitle}`)
       .join("\n");
@@ -392,11 +410,12 @@ export function buildCourseConfirmationMailCopy(input: {
     attachmentLine,
     "",
     "Mit freundlichen Grüßen",
-    ASC_CLUB.name,
-    "",
-    ASC_CLUB.street,
-    `${ASC_CLUB.postalCode} ${ASC_CLUB.city}`,
-    `Steuernummer ${ASC_CLUB.taxId}`,
+    ...[
+      brand.name,
+      brand.street,
+      [brand.postalCode, brand.city].filter(Boolean).join(" "),
+      brand.taxId ? `Steuernummer ${brand.taxId}` : "",
+    ].filter(Boolean),
   ].join("\n");
 
   const html = `<!DOCTYPE html>
@@ -411,12 +430,17 @@ export function buildCourseConfirmationMailCopy(input: {
     <p style="margin:0 0 16px;">${escapeHtml(greeting)}</p>
     <div style="margin:0 0 16px;">${introHtml}</div>
     <p style="margin:0 0 16px;">${escapeHtml(attachmentLine)}</p>
-    <p style="margin:0 0 24px;">Mit freundlichen Grüßen<br />${escapeHtml(ASC_CLUB.name)}</p>
+    <p style="margin:0 0 24px;">Mit freundlichen Grüßen<br />${escapeHtml(brand.name)}</p>
     <p style="margin:0;font-size:13px;line-height:1.45;color:#555555;">
-      ${escapeHtml(ASC_CLUB.name)}<br />
-      ${escapeHtml(ASC_CLUB.street)}<br />
-      ${escapeHtml(`${ASC_CLUB.postalCode} ${ASC_CLUB.city}`)}<br />
-      Steuernummer ${escapeHtml(ASC_CLUB.taxId)}
+      ${[
+        brand.name,
+        brand.street,
+        [brand.postalCode, brand.city].filter(Boolean).join(" "),
+        brand.taxId ? `Steuernummer ${brand.taxId}` : "",
+      ]
+        .filter(Boolean)
+        .map((line) => escapeHtml(line))
+        .join("<br />")}
     </p>
   </div>
 </body>

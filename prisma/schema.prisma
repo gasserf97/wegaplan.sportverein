@@ -783,6 +783,27 @@ model ClubSettings {
   /// Hochgeladenes Vereinslogo unter uploads/club. Leer = eingebautes Zeichen.
   logoStorageKey            String    @default("")
   logoMimeType              String    @default("")
+  /// Stempel mit Unterschrift für die Einzahlungsbestätigung. Leer = beim Verein lajen die eingebaute Datei, sonst keiner.
+  stampStorageKey           String    @default("")
+  stampMimeType             String    @default("")
+  /// Name auf Belegen und der Mitgliedskarte. Leer = Vereinsname, bei lajen der bisherige ASC-Name.
+  letterName                String    @default("")
+  namePrimary               String    @default("")
+  nameSecondary             String    @default("")
+  president                 String    @default("")
+  street                    String    @default("")
+  postalCode                String    @default("")
+  city                      String    @default("")
+  province                  String    @default("")
+  taxId                     String    @default("")
+  vatId                     String    @default("")
+  legalForm                 String    @default("")
+  tennisClubName            String    @default("")
+  /// #rrggbb. Leer = Standardfarben. Sektionsfarben bleiben davon unabhängig.
+  colorPrimary              String    @default("")
+  colorCardStart            String    @default("")
+  colorCardMid              String    @default("")
+  colorCardEnd              String    @default("")
   configuredAt              DateTime?
 }
 

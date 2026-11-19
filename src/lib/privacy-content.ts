@@ -1,4 +1,5 @@
 import { ASC_CLUB } from "@/lib/brand";
+import type { ClubBrand } from "@/lib/club-brand";
 import type { Locale } from "@/lib/i18n/types";
 
 export type PrivacySection = {
@@ -257,6 +258,37 @@ const it: PrivacyContent = {
   ],
 };
 
-export function getPrivacyContent(locale: Locale): PrivacyContent {
-  return locale === "it" ? it : de;
+export function getPrivacyContent(locale: Locale, brand?: ClubBrand): PrivacyContent {
+  const base = locale === "it" ? it : de;
+  if (!brand) return base;
+  const content = structuredClone(base);
+  const address = [brand.street, [brand.postalCode, brand.city].filter(Boolean).join(" ")]
+    .filter(Boolean)
+    .join(", ");
+  const controller = content.sections[0];
+  if (!controller) return content;
+  if (locale === "it") {
+    content.intro[0] = brand.taxId
+      ? `${brand.name} (codice fiscale ${brand.taxId}) gestisce questa piattaforma online per tesseramenti, corsi, prenotazioni dei campi da tennis e dei veicoli del club nonché i relativi pagamenti.`
+      : `${brand.name} gestisce questa piattaforma online per tesseramenti, corsi, prenotazioni dei campi da tennis e dei veicoli del club nonché i relativi pagamenti.`;
+    controller.paragraphs = [
+      brand.name,
+      address,
+      brand.taxId ? `Codice fiscale: ${brand.taxId}` : "",
+      brand.president ? `Rappresentato dal Presidente: ${brand.president}` : "",
+      controller.paragraphs.at(-1) ?? "",
+    ].filter(Boolean);
+  } else {
+    content.intro[0] = brand.taxId
+      ? `Der ${brand.name} (Steuernummer ${brand.taxId}) betreibt diese Online-Plattform zur Verwaltung von Mitgliedschaften, Kursen, Tennisplatz- und Fahrzeugreservierungen sowie zugehörigen Zahlungen.`
+      : `Der ${brand.name} betreibt diese Online-Plattform zur Verwaltung von Mitgliedschaften, Kursen, Tennisplatz- und Fahrzeugreservierungen sowie zugehörigen Zahlungen.`;
+    controller.paragraphs = [
+      brand.name,
+      address,
+      brand.taxId ? `Steuernummer: ${brand.taxId}` : "",
+      brand.president ? `Vertreten durch den Präsidenten: ${brand.president}` : "",
+      controller.paragraphs.at(-1) ?? "",
+    ].filter(Boolean);
+  }
+  return content;
 }

@@ -189,7 +189,7 @@ async function sendCourseConfirmationGroup(
   );
   const items = prepared.map((row) => row.item);
   const attachments = prepared.map((row) => row.attachment);
-  const copy = buildCourseConfirmationMailCopy({
+  const copy = await buildCourseConfirmationMailCopy({
     recipientName: primary.greetingName,
     items,
   });
@@ -370,7 +370,7 @@ export async function sendSubscriptionConfirmation(
     paidAt,
   });
   const items = [{ memberName, courseTitle: planTitle }];
-  const copy = buildCourseConfirmationMailCopy({
+  const copy = await buildCourseConfirmationMailCopy({
     recipientName: delivery.greetingName,
     items,
     context: "subscription",

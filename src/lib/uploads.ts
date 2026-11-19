@@ -192,17 +192,34 @@ export async function saveClubEventImage(file: File) {
   );
 }
 
+function clubImageKey(clubId: string, kind: "logo" | "stamp") {
+  if (!/^[a-zA-Z0-9_-]+$/.test(clubId)) return null;
+  return path.posix.join("club", clubId, `${kind}-${randomUUID()}`);
+}
+
 /** Speichert das Logo eines Vereins. Ersetzt die bisherige Datei nicht selbst. */
 export async function saveClubLogo(clubId: string, file: File) {
-  if (!/^[a-zA-Z0-9_-]+$/.test(clubId)) {
-    return { ok: false as const, error: "Kein Verein im Kontext." };
-  }
+  const key = clubImageKey(clubId, "logo");
+  if (!key) return { ok: false as const, error: "Kein Verein im Kontext." };
   return saveSniffedImage(
     file,
-    path.posix.join("club", clubId, randomUUID()),
+    key,
     LOGO_MAX_BYTES,
     "Bitte ein Logo auswählen.",
     "Das Logo darf maximal 2 MB groß sein.",
+  );
+}
+
+/** Speichert den Stempel eines Vereins. Ersetzt die bisherige Datei nicht selbst. */
+export async function saveClubStamp(clubId: string, file: File) {
+  const key = clubImageKey(clubId, "stamp");
+  if (!key) return { ok: false as const, error: "Kein Verein im Kontext." };
+  return saveSniffedImage(
+    file,
+    key,
+    LOGO_MAX_BYTES,
+    "Bitte einen Stempel auswählen.",
+    "Der Stempel darf maximal 2 MB groß sein.",
   );
 }
 

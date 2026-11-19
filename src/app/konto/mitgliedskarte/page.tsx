@@ -8,7 +8,7 @@ import {
 import { PrintMembershipCardButton } from "@/components/print-membership-card-button";
 import { ResendMembershipCardButton } from "@/components/resend-membership-card-button";
 import { getCurrentUser } from "@/lib/auth";
-import { clubDisplayName } from "@/lib/club-settings";
+import { getClubBrand } from "@/lib/club-brand";
 import { listFamily } from "@/lib/family";
 import { getServerI18n } from "@/lib/i18n";
 import { isMailConfigured, mailConfigIssue } from "@/lib/mail";
@@ -21,7 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function MembershipCardPage() {
   const { t } = await getServerI18n();
-  const clubName = await clubDisplayName();
+  const brand = await getClubBrand();
   const user = await getCurrentUser();
   if (!user) redirect("/anmelden?next=/konto/mitgliedskarte");
 
@@ -72,7 +72,13 @@ export default async function MembershipCardPage() {
           {cards.map((item) => (
             <li key={item.id} className="print:break-inside-avoid space-y-3">
               <MembershipCardView
-                clubName={clubName}
+                clubName={brand.name}
+                logoUrl={brand.logoUrl}
+                colors={{
+                  start: brand.colorCardStart,
+                  mid: brand.colorCardMid,
+                  end: brand.colorCardEnd,
+                }}
                 data={toCardData({
                   userId: item.user.id,
                   name: item.user.name,

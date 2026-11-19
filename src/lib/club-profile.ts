@@ -19,14 +19,36 @@ export function clubLogoUrl(
   return `/api/club/logo?v=${encodeURIComponent(version)}`;
 }
 
+export function clubStampUrl(
+  settings: { stampStorageKey: string | null } | null | undefined,
+) {
+  const key = settings?.stampStorageKey?.trim() ?? "";
+  if (!key) return null;
+  const file = key.split("/").pop() ?? "stamp";
+  const version = file.replace(/\.[^.]+$/, "");
+  return `/api/club/stamp?v=${encodeURIComponent(version)}`;
+}
+
 export function isClubLogoMime(mimeType: string | null | undefined) {
   return Boolean(mimeType && LOGO_MIME.has(mimeType));
 }
 
 export async function readClubLogoBytes() {
   const settings = await getClubProfile();
-  const key = settings?.logoStorageKey?.trim() ?? "";
-  if (!key || !isClubLogoMime(settings?.logoMimeType)) return null;
+  return readStoredImage(settings?.logoStorageKey, settings?.logoMimeType);
+}
+
+export async function readClubStampBytes() {
+  const settings = await getClubProfile();
+  return readStoredImage(settings?.stampStorageKey, settings?.stampMimeType);
+}
+
+async function readStoredImage(
+  storageKey: string | null | undefined,
+  mimeType: string | null | undefined,
+) {
+  const key = storageKey?.trim() ?? "";
+  if (!key || !isClubLogoMime(mimeType)) return null;
   try {
     return await readStoredFile(key);
   } catch {

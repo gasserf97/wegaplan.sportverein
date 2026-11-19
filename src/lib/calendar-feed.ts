@@ -1,4 +1,4 @@
-import { ASC_CLUB } from "@/lib/brand";
+import { clubBrandAddressLine, getClubBrand } from "@/lib/club-brand";
 import { courseSessionOccurrences, formatCourseSchedule } from "@/lib/course-schedule";
 import { isActiveCourseEnrollment } from "@/lib/courses";
 import { ageFromBirthDate } from "@/lib/pricing";
@@ -123,7 +123,7 @@ export async function loadCourtCalendarEvents(userId: string, now = new Date()) 
     orderBy: { startsAt: "asc" },
   });
 
-  const locationBase = `${ASC_CLUB.street}, ${ASC_CLUB.postalCode} ${ASC_CLUB.city}`;
+  const locationBase = clubBrandAddressLine(await getClubBrand());
 
   return reservations.map((reservation): CalendarFeedEvent => {
     const details = [
@@ -134,7 +134,7 @@ export async function loadCourtCalendarEvents(userId: string, now = new Date()) 
       id: reservation.id,
       title: `Tennis · ${reservation.court.name}`,
       description: details.join("\n") || "Tennisplatz-Reservierung",
-      location: `${reservation.court.name}, ${locationBase}`,
+        location: [reservation.court.name, locationBase].filter(Boolean).join(", "),
       startsAt: reservation.startsAt,
       endsAt: reservation.endsAt,
       createdAt: reservation.createdAt,
@@ -190,7 +190,7 @@ export async function loadCourseCalendarEvents(
     },
   });
 
-  const locationBase = `${ASC_CLUB.street}, ${ASC_CLUB.postalCode} ${ASC_CLUB.city}`;
+  const locationBase = clubBrandAddressLine(await getClubBrand());
   const events: CalendarFeedEvent[] = [];
 
   for (const enrollment of enrollments) {

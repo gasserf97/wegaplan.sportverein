@@ -24,7 +24,7 @@ import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import { SessionKeepAlive } from "@/components/session-keep-alive";
 import { SupportTicketButton } from "@/components/support-ticket-button";
 import { Toaster } from "@/components/ui/sonner";
-import { clubLogoUrl, getClubProfile } from "@/lib/club-profile";
+import { getClubBrand } from "@/lib/club-brand";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -115,14 +115,18 @@ export default async function RootLayout({
     user !== null &&
     !lockNavigation &&
     (await canBookFleetDevices(user));
-  const clubLogo = clubLogoUrl(await getClubProfile());
+  const brand = await getClubBrand();
+  const clubLogo = brand.logoUrl;
 
   return (
     <html
       lang={localeToIntlTag(locale)}
       className={`${geistSans.variable} ${montserrat.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col bg-background text-foreground">
+      <body
+        className="flex min-h-full flex-col bg-background text-foreground"
+        style={{ ["--primary" as string]: brand.colorPrimary }}
+      >
         <LocaleProvider locale={locale}>
           <ThemeProvider>
             <SiteHeader

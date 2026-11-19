@@ -7,7 +7,7 @@ import {
 } from "@/lib/membership-card-data";
 import { isMailConfigured, mailConfigIssue, sendMail } from "@/lib/mail";
 import { resolveConfirmationDelivery } from "@/lib/notification-email";
-import { clubDisplayName } from "@/lib/club-settings";
+import { getClubBrand } from "@/lib/club-brand";
 import { getAppUrl, getPublicAppUrl } from "@/lib/stripe";
 import { ASC_LAJEN } from "@/lib/brand";
 
@@ -19,7 +19,11 @@ function escapeHtml(value: string) {
     .replace(/"/g, "&quot;");
 }
 
-function membershipCardTableHtml(data: MembershipCardData, clubName: string) {
+function membershipCardTableHtml(
+  data: MembershipCardData,
+  clubName: string,
+  colors: { start: string; mid: string; end: string },
+) {
   const name = escapeHtml(data.name);
   const memberNo = escapeHtml(data.memberNo);
   const plan = escapeHtml(data.planTitle);
@@ -32,7 +36,7 @@ function membershipCardTableHtml(data: MembershipCardData, clubName: string) {
   const born = escapeHtml(formatBirthDate(data.birthDate));
   const logoUrl = `${getPublicAppUrl()}/api/club/logo`;
 
-  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:380px;margin:0 0 16px;border-collapse:separate;border-spacing:0;border-radius:16px;overflow:hidden;background:linear-gradient(160deg, ${ASC_LAJEN.red} 0%, ${ASC_LAJEN.navy} 55%, ${ASC_LAJEN.green} 100%);">
+  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:380px;margin:0 0 16px;border-collapse:separate;border-spacing:0;border-radius:16px;overflow:hidden;background:linear-gradient(160deg, ${colors.start} 0%, ${colors.mid} 55%, ${colors.end} 100%);">
     <tr>
       <td style="padding:20px 20px 12px 20px;">
         <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
@@ -55,9 +59,9 @@ function membershipCardTableHtml(data: MembershipCardData, clubName: string) {
         <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#ffffff;border-radius:12px;">
           <tr>
             <td style="padding:16px 20px;">
-              <p style="margin:0;font-size:20px;font-weight:bold;color:${ASC_LAJEN.navy};">${name}</p>
+              <p style="margin:0;font-size:20px;font-weight:bold;color:${colors.mid};">${name}</p>
               <p style="margin:8px 0 0;font-size:13px;color:#666666;">Nr. ${memberNo} · geb. ${born}</p>
-              <p style="margin:16px 0 0;font-size:14px;font-weight:bold;color:${ASC_LAJEN.green};">${plan}</p>
+              <p style="margin:16px 0 0;font-size:14px;font-weight:bold;color:${colors.end};">${plan}</p>
               <p style="margin:6px 0 0;font-size:13px;font-weight:bold;color:${ASC_LAJEN.dark};">${valid}</p>
             </td>
           </tr>
@@ -84,9 +88,20 @@ function membershipCardBlockText(data: MembershipCardData) {
 export function membershipCardEmailHtml(
   cards: MembershipCardData | MembershipCardData[],
   cardUrl: string,
-  options?: { recipientName?: string; intro?: string; clubName?: string },
+  options?: {
+    recipientName?: string;
+    intro?: string;
+    clubName?: string;
+    colors?: { start: string; mid: string; end: string; link: string };
+  },
 ) {
   const clubName = options?.clubName?.trim() || "Sportverein";
+  const colors = options?.colors ?? {
+    start: ASC_LAJEN.red,
+    mid: ASC_LAJEN.navy,
+    end: ASC_LAJEN.green,
+    link: ASC_LAJEN.teal,
+  };
   const list = Array.isArray(cards) ? cards : [cards];
   const greetingName = escapeHtml(
     options?.recipientName?.trim() || list[0]?.name || "",
@@ -105,10 +120,10 @@ export function membershipCardEmailHtml(
   <p style="margin:0 0 20px;font-size:15px;line-height:1.5;">
     ${escapeHtml(introText)}
   </p>
-  ${list.map((data) => membershipCardTableHtml(data, clubName)).join("\n")}
+  ${list.map((data) => membershipCardTableHtml(data, clubName, colors)).join("\n")}
   <p style="margin:20px 0 0;font-size:14px;">
     Karte${plural ? "n" : ""} im Konto öffnen oder drucken:<br />
-    <a href="${escapeHtml(cardUrl)}" style="color:${ASC_LAJEN.teal};">${escapeHtml(cardUrl)}</a>
+    <a href="${escapeHtml(cardUrl)}" style="color:${colors.link};">${escapeHtml(cardUrl)}</a>
   </p>
   <p style="margin:16px 0 0;font-size:13px;color:#666;">${escapeHtml(clubName)}</p>
 </body>
@@ -242,11 +257,18 @@ async function sendMembershipCardGroup(
       periodEnd: row.periodEnd,
     }),
   );
-  const clubName = await clubDisplayName();
+  const brand = await getClubBrand();
+  const clubName = brand.name;
   const cardUrl = `${await getAppUrl()}/konto/mitgliedskarte`;
   const html = membershipCardEmailHtml(cards, cardUrl, {
     recipientName: primary.greetingName,
     clubName,
+    colors: {
+      start: brand.colorCardStart,
+      mid: brand.colorCardMid,
+      end: brand.colorCardEnd,
+      link: brand.colorPrimary,
+    },
   });
   const text = membershipCardEmailText(cards, cardUrl, {
     recipientName: primary.greetingName,

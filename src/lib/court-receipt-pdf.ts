@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
-import { ASC_CLUB, ASC_LAJEN } from "@/lib/brand";
+import { ASC_LAJEN } from "@/lib/brand";
+import { getClubBrand } from "@/lib/club-brand";
 import type { Locale } from "@/lib/i18n/types";
 import { readPublicAsset } from "@/lib/public-asset";
 
@@ -200,12 +201,13 @@ export async function buildCourtPaymentReceiptPdf(input: CourtReceiptPdfInput) {
   const duration = formatDuration(hours, locale);
   const usage = courtUsageDescription(input.courtName, locale);
 
+  const brand = await getClubBrand();
   const pdf = await PDFDocument.create();
   pdf.setTitle(labels.title(receiptNo));
-  pdf.setAuthor(ASC_CLUB.name);
+  pdf.setAuthor(brand.name);
   pdf.setSubject(labels.subject);
-  pdf.setCreator(ASC_CLUB.name);
-  pdf.setProducer(ASC_CLUB.name);
+  pdf.setCreator(brand.name);
+  pdf.setProducer(brand.name);
   pdf.setLanguage(labels.language);
   pdf.setCreationDate(input.paidAt);
   pdf.setModificationDate(new Date());
@@ -230,25 +232,34 @@ export async function buildCourtPaymentReceiptPdf(input: CourtReceiptPdfInput) {
     y -= size + 12;
   }
 
-  drawCentered(page, labels.legalForm, bold, 11, y, dark);
+  const legalForm = brand.legalForm || labels.legalForm;
+  drawCentered(page, legalForm, bold, 11, y, dark);
   y -= 16;
-  drawCentered(page, ASC_CLUB.tennisClubName, bold, 13, y, dark);
+  drawCentered(page, brand.tennisClubName, bold, 13, y, dark);
   y -= 18;
-  drawCentered(page, ASC_CLUB.street, regular, 10, y, dark);
-  y -= 14;
-  drawCentered(
-    page,
-    `${ASC_CLUB.postalCode} ${ASC_CLUB.city} (${ASC_CLUB.province})`,
-    regular,
-    10,
-    y,
-    dark,
-  );
-  y -= 14;
-  drawCentered(page, `C.F. ${ASC_CLUB.taxId}`, regular, 10, y, dark);
-  y -= 14;
-  drawCentered(page, `P. IVA ${ASC_CLUB.vatId}`, regular, 10, y, dark);
-  y -= 22;
+  if (brand.street) {
+    drawCentered(page, brand.street, regular, 10, y, dark);
+    y -= 14;
+  }
+  const place = [
+    [brand.postalCode, brand.city].filter(Boolean).join(" "),
+    brand.province ? `(${brand.province})` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  if (place) {
+    drawCentered(page, place, regular, 10, y, dark);
+    y -= 14;
+  }
+  if (brand.taxId) {
+    drawCentered(page, `C.F. ${brand.taxId}`, regular, 10, y, dark);
+    y -= 14;
+  }
+  if (brand.vatId) {
+    drawCentered(page, `P. IVA ${brand.vatId}`, regular, 10, y, dark);
+    y -= 14;
+  }
+  y -= 8;
 
   page.drawLine({
     start: { x: MARGIN, y },
