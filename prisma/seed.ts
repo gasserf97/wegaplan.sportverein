@@ -16,13 +16,28 @@ async function main() {
   });
   if (marker) return;
 
-  const [userCount, courseCount, planCount, sectionCount] = await Promise.all([
-    prisma.user.count(),
-    prisma.course.count(),
-    prisma.subscriptionPlan.count(),
-    prisma.section.count(),
-  ]);
-  if (userCount > 0 || courseCount > 0 || planCount > 0 || sectionCount > 0) {
+  const [userCount, courseCount, planCount, sectionCount, restoredSection] =
+    await Promise.all([
+      prisma.user.count(),
+      prisma.course.count(),
+      prisma.subscriptionPlan.count(),
+      prisma.section.count(),
+      prisma.section.findUnique({
+        where: { id: "cmfreizeitaktivrest01" },
+        select: { name: true },
+      }),
+    ]);
+  // migrate deploy always inserts this placeholder. It is not club content,
+  // so a fresh database must still receive the demo accounts.
+  const onlyRestoredPlaceholder =
+    sectionCount === 0 ||
+    (sectionCount === 1 && restoredSection?.name === "Freizeit Aktiv");
+  if (
+    userCount > 0 ||
+    courseCount > 0 ||
+    planCount > 0 ||
+    !onlyRestoredPlaceholder
+  ) {
     await prisma.seedMarker.create({ data: { key: SEED_EXAMPLES_MARKER } });
     return;
   }
