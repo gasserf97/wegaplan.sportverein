@@ -116,6 +116,7 @@ export function SiteHeader({
   lockNavigation = false,
   clubName = "Sportverein",
   showWordmark = false,
+  clubLogoUrl = null,
 }: {
   user: SessionUser | null;
   showAdmin?: boolean;
@@ -124,6 +125,7 @@ export function SiteHeader({
   lockNavigation?: boolean;
   clubName?: string;
   showWordmark?: boolean;
+  clubLogoUrl?: string | null;
 }) {
   const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -138,7 +140,7 @@ export function SiteHeader({
           className="flex shrink-0 items-center gap-2 sm:gap-3"
           aria-label={clubName}
         >
-          <ClubLogo variant="icon" href={null} priority />
+          <ClubLogo variant="icon" href={null} priority src={clubLogoUrl} />
           {showWordmark ? (
             <ClubLogo
               variant="wordmark"

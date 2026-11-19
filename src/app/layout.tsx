@@ -24,6 +24,7 @@ import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import { SessionKeepAlive } from "@/components/session-keep-alive";
 import { SupportTicketButton } from "@/components/support-ticket-button";
 import { Toaster } from "@/components/ui/sonner";
+import { clubLogoUrl, getClubProfile } from "@/lib/club-profile";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -111,6 +112,7 @@ export default async function RootLayout({
     user !== null &&
     !lockNavigation &&
     (await canBookFleetDevices(user));
+  const clubLogo = clubLogoUrl(await getClubProfile());
 
   return (
     <html
@@ -128,6 +130,7 @@ export default async function RootLayout({
               lockNavigation={lockNavigation}
               clubName={host.name}
               showWordmark={isLegacyClub(host.slug)}
+              clubLogoUrl={clubLogo}
             />
             {impersonation ? (
               <ImpersonationBanner
@@ -144,6 +147,7 @@ export default async function RootLayout({
               clubName={host.name}
               impressumUrl={await clubImpressumUrl()}
               showLegacyTagline={isLegacyClub(host.slug)}
+              clubLogoUrl={clubLogo}
             />
             {!lockNavigation ? (
               <MobileTabBar isLoggedIn={Boolean(user)} />
@@ -152,7 +156,7 @@ export default async function RootLayout({
               <SupportTicketButton isLoggedIn={Boolean(user)} />
             ) : null}
             <ClientChannelCookie />
-            <PwaInstallPrompt isLoggedIn={Boolean(user)} />
+            <PwaInstallPrompt isLoggedIn={Boolean(user)} clubLogoUrl={clubLogo} />
             {user ? (
               <SessionKeepAlive
                 refreshAfterMs={SESSION_REFRESH_AFTER_SECONDS * 1000}

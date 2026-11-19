@@ -780,6 +780,9 @@ model ClubSettings {
   stripeFeeFixedCents       String    @default("")
   showcaseMode              Boolean   @default(false)
   impressumUrl              String    @default("")
+  /// Hochgeladenes Vereinslogo unter uploads/club. Leer = eingebautes Zeichen.
+  logoStorageKey            String    @default("")
+  logoMimeType              String    @default("")
   configuredAt              DateTime?
 }
 

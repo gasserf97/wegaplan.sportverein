@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ClubLogoForm } from "@/components/club-logo-form";
 import {
   SectionAccentForm,
   SectionCreateForm,
@@ -8,8 +9,10 @@ import {
   SectionDeleteButton,
   SectionMoveButtons,
   SectionPaymentsForm,
+  SectionSettingsGroup,
   SectionStripeSetupGuide,
 } from "@/components/section-admin";
+import { clubLogoUrl, getClubProfile } from "@/lib/club-profile";
 import { getAccent, resolveAccent } from "@/lib/accents";
 import { cn } from "@/lib/utils";
 import { requireAdmin } from "@/lib/auth";
@@ -27,12 +30,15 @@ export default async function SectionsAdminPage() {
   const admin = await requireAdmin();
   if (!admin) redirect("/admin");
 
-  const sections = await prisma.section.findMany({
-    orderBy: sectionListOrderBy,
-    include: {
-      _count: { select: { members: true, courses: true, admins: true } },
-    },
-  });
+  const [sections, clubProfile] = await Promise.all([
+    prisma.section.findMany({
+      orderBy: sectionListOrderBy,
+      include: {
+        _count: { select: { members: true, courses: true, admins: true } },
+      },
+    }),
+    getClubProfile(),
+  ]);
 
   const webhookUrl = await stripeWebhookEndpointUrl();
   const paymentStatuses = await Promise.all(sections.map(async (section) => ({
@@ -52,9 +58,12 @@ export default async function SectionsAdminPage() {
           <h1 className="text-4xl text-primary">Sektionen</h1>
           <p className="mt-2 text-muted-foreground">
             Kurs, Auto und Mitgliedschaft brauchen immer eine Sektion. Die
-            Kartenfarbe gilt für alle Kurse der Sektion. Zahlungsdaten trägt der
-            Betreiber in den Vereinseinstellungen ein. Mit ↑/↓ legen Sie die Reihenfolge für Dropdowns fest.
-            Sektions-Admins sind Admin-Rechte – keine bezahlte Vereinsmitgliedschaft.
+            Kartenfarbe gilt für alle Kurse der Sektion. Das Logo oben gilt für
+            diesen Verein. Die Sektionseinstellungen sind in Darstellung,
+            Guthaben und Zahlung unterteilt. Zahlungsdaten trägt der Betreiber
+            in den Vereinseinstellungen ein. Mit ↑/↓ legen Sie die Reihenfolge
+            für Dropdowns fest. Sektions-Admins sind Admin-Rechte – keine
+            bezahlte Vereinsmitgliedschaft.
           </p>
         </div>
         <Link
@@ -79,6 +88,16 @@ export default async function SectionsAdminPage() {
           Der Betreiber trägt IBAN und Kontoinhaber in den Vereinseinstellungen ein.
         </p>
       ) : null}
+
+      <div className="mt-8 rounded-2xl bg-card p-6 ring-1 ring-foreground/10">
+        <h2 className="text-2xl">Verein</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Angaben, die für den ganzen Verein gelten.
+        </p>
+        <SectionSettingsGroup title="Logo">
+          <ClubLogoForm logoUrl={clubLogoUrl(clubProfile)} />
+        </SectionSettingsGroup>
+      </div>
 
       <div className="mt-8 rounded-2xl bg-card p-6 ring-1 ring-foreground/10">
         <SectionCreateForm />
@@ -133,10 +152,6 @@ export default async function SectionsAdminPage() {
                     </p>
                   </div>
                   <div className="flex flex-wrap items-start gap-2">
-                    <SectionAccentForm
-                      sectionId={section.id}
-                      accent={section.accent}
-                    />
                     <SectionMoveButtons
                       sectionId={section.id}
                       canMoveUp={index > 0}
@@ -145,18 +160,27 @@ export default async function SectionsAdminPage() {
                     <SectionDeleteButton sectionId={section.id} />
                   </div>
                 </div>
-                <SectionCreditToggle
-                  sectionId={section.id}
-                  creditAllowed={section.creditAllowed}
-                />
-                <SectionPaymentsForm
-                  sectionId={section.id}
-                  sectionName={section.name}
-                  paymentEnvKey={section.paymentEnvKey ?? ""}
-                  bankConfigured={bankConfigured}
-                  stripeCheckoutReady={stripeStatus.checkoutReady}
-                  stripeWebhookConfigured={stripeStatus.webhookConfigured}
-                />
+                <SectionSettingsGroup title="Darstellung">
+                  <SectionAccentForm
+                    sectionId={section.id}
+                    accent={section.accent}
+                  />
+                </SectionSettingsGroup>
+                <SectionSettingsGroup title="Guthaben">
+                  <SectionCreditToggle
+                    sectionId={section.id}
+                    creditAllowed={section.creditAllowed}
+                  />
+                </SectionSettingsGroup>
+                <SectionSettingsGroup title="Zahlung">
+                  <SectionPaymentsForm
+                    sectionId={section.id}
+                    paymentEnvKey={section.paymentEnvKey ?? ""}
+                    bankConfigured={bankConfigured}
+                    stripeCheckoutReady={stripeStatus.checkoutReady}
+                    stripeWebhookConfigured={stripeStatus.webhookConfigured}
+                  />
+                </SectionSettingsGroup>
               </li>
             );
           })}
