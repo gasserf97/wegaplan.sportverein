@@ -62,7 +62,13 @@ function consumeInstallAppQuery() {
   }
 }
 
-export function PwaInstallPrompt({ isLoggedIn }: { isLoggedIn: boolean }) {
+export function PwaInstallPrompt({
+  isLoggedIn,
+  clubLogoUrl = null,
+}: {
+  isLoggedIn: boolean;
+  clubLogoUrl?: string | null;
+}) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [installing, setInstalling] = useState(false);
@@ -191,7 +197,7 @@ export function PwaInstallPrompt({ isLoggedIn }: { isLoggedIn: boolean }) {
       <DialogContent className="sm:max-w-md" showCloseButton>
         <DialogHeader>
           <div className="mb-1">
-            <ClubLogo variant="icon" href={null} className="size-10" />
+            <ClubLogo variant="icon" href={null} src={clubLogoUrl} className="size-10" />
           </div>
           <DialogTitle>{t("pwa.title")}</DialogTitle>
           <DialogDescription>{t("pwa.description")}</DialogDescription>

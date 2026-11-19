@@ -141,7 +141,7 @@ export function SectionCreditToggle({
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <div className="mt-4 grid gap-1 border-t border-border pt-4">
+    <div className="grid gap-1">
       <label className="flex items-start gap-2 text-sm">
         <input
           type="checkbox"
@@ -308,16 +308,31 @@ export function SectionStripeSetupGuide({ webhookUrl }: { webhookUrl: string }) 
   );
 }
 
+export function SectionSettingsGroup({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="mt-4 rounded-lg bg-muted/40 p-4">
+      <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+        {title}
+      </h3>
+      <div className="mt-3">{children}</div>
+    </section>
+  );
+}
+
 export function SectionPaymentsForm({
   sectionId,
-  sectionName,
   paymentEnvKey,
   bankConfigured,
   stripeCheckoutReady,
   stripeWebhookConfigured,
 }: {
   sectionId: string;
-  sectionName: string;
   paymentEnvKey: string;
   bankConfigured: boolean;
   stripeCheckoutReady: boolean;
@@ -342,10 +357,9 @@ export function SectionPaymentsForm({
     <form
       key={formKey}
       action={formAction}
-      className="mt-4 grid gap-3 border-t border-border pt-4"
+      className="grid gap-3"
     >
       <input type="hidden" name="sectionId" value={sectionId} />
-      <p className="text-sm font-medium">Zahlungskonto – {sectionName}</p>
       <p className="text-xs text-muted-foreground">
         Aus Sicherheitsgründen werden IBAN, Stripe Secret Key und Stripe
         Webhook Secret nicht in der App oder Datenbank gespeichert. Pro Sektion

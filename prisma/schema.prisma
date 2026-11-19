@@ -172,6 +172,14 @@ model CreditTransaction {
   @@index([deviceReservationId])
 }
 
+/// Vereinsweite Angaben. Genau eine Zeile, id ist immer "default".
+model ClubProfile {
+  id             String  @id
+  /// Hochgeladenes Vereinslogo unter uploads/club. Leer = eingebautes ASC-Logo.
+  logoStorageKey String?
+  logoMimeType   String?
+}
+
 model Section {
   id                 String         @id @default(cuid())
   name               String         @unique
