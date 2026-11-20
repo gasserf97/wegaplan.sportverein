@@ -33,7 +33,7 @@ export const it = {
     adminCourts: "Campi da tennis",
     adminFleet: "Parco veicoli",
     adminTickets: "Ticket",
-    adminHosting: "Hosting",
+    adminHosting: "Visitatori",
     adminEvents: "Eventi",
   },
 
@@ -867,7 +867,10 @@ export const it = {
     accessDeniedLink: "Torna all'admin",
     hostingTitle: "Hosting e utilizzo",
     hostingDesc:
-      "Monitora app e Postgres. Circa dal 70 % di utilizzo compare un avviso, dal 85 % un consiglio urgente di upgrade su Render.",
+      "Server, database e Render di questa installazione. Circa dal 70 % di utilizzo compare un avviso, dal 85 % un consiglio urgente di upgrade.",
+    hostingUsageTitle: "Visitatori",
+    hostingUsageDesc:
+      "Persone che hanno effettuato l’accesso oggi e quante sono in linea nello stesso momento.",
     hostingCheckedAt: "Ultimo controllo: {time}",
     hostingOverall: "Stato generale",
     hostingAllOk: "Tutto a posto – nessun upgrade necessario.",

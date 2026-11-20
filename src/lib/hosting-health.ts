@@ -2,12 +2,14 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import {
   CONCURRENT_METRIC_ID,
+  concurrentPeakId,
   concurrentValueLabel,
   countOnlineUsers,
   ONLINE_WINDOW_MS,
 } from "@/lib/concurrent-users";
 import { prisma } from "@/lib/prisma";
 import { CLUB_TIMEZONE } from "@/lib/format";
+import { currentClubId } from "@/lib/tenant-context";
 
 export type HealthLevel = "ok" | "warn" | "critical" | "unknown";
 
@@ -127,8 +129,9 @@ async function collectDailyLoginMetric(): Promise<HealthMetric> {
   } catch (error) {
     console.error("Hosting-Logins heute", error);
   }
+  const clubId = await currentClubId();
   return {
-    id: "logins_today",
+    id: clubId ? `logins_today:${clubId}` : "logins_today",
     label: "User angemeldet (heute)",
     level: "ok",
     valueLabel: String(count),
@@ -152,8 +155,9 @@ async function collectConcurrentUsersMetric(): Promise<HealthMetric> {
     ONLINE_WINDOW_MS <= 60_000
       ? "der letzten Minute"
       : `den letzten ${Math.round(ONLINE_WINDOW_MS / 60_000)} Minuten`;
+  const clubId = await currentClubId();
   return {
-    id: CONCURRENT_METRIC_ID,
+    id: clubId ? concurrentPeakId(clubId) : CONCURRENT_METRIC_ID,
     label: "User gleichzeitig online",
     level: "ok",
     valueLabel: concurrentValueLabel(count),
@@ -493,20 +497,37 @@ async function collectRenderMetrics(): Promise<{
   };
 }
 
-export async function getHostingHealth(): Promise<HostingHealthReport> {
-  const [logins, concurrent, local, render] = await Promise.all([
-    collectDailyLoginMetric(),
-    collectConcurrentUsersMetric(),
-    collectLocalMetrics(),
-    collectRenderMetrics(),
-  ]);
-
-  const metrics = [logins, concurrent, ...render.metrics, ...local];
+async function withPeaks(metrics: HealthMetric[]) {
   try {
     await applyMetricPeaks(metrics);
   } catch (error) {
     console.error("Hosting-Höchststände", error);
   }
+  return metrics;
+}
+
+/** Besucherzahlen des aktuellen Vereins. */
+export async function getClubUsage(): Promise<HostingHealthReport> {
+  const metrics = await withPeaks([
+    await collectDailyLoginMetric(),
+    await collectConcurrentUsersMetric(),
+  ]);
+  return {
+    checkedAt: new Date().toISOString(),
+    overall: "ok",
+    metrics,
+    recommendations: [],
+    renderConfigured: true,
+  };
+}
+
+/** Server, Datenbank und Render der ganzen Installation. */
+export async function getPlatformHostingHealth(): Promise<HostingHealthReport> {
+  const [local, render] = await Promise.all([
+    collectLocalMetrics(),
+    collectRenderMetrics(),
+  ]);
+  const metrics = await withPeaks([...render.metrics, ...local]);
   const overall = worstLevel(metrics.map((m) => m.level));
   const recommendations = [
     ...new Set(

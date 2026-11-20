@@ -33,7 +33,7 @@ export const de = {
     adminCourts: "Tennisplätze",
     adminFleet: "Fuhrpark",
     adminTickets: "Tickets",
-    adminHosting: "Hosting",
+    adminHosting: "Besucher",
     adminEvents: "Events",
   },
 
@@ -886,7 +886,10 @@ export const de = {
     accessDeniedLink: "Zur Startseite",
     hostingTitle: "Hosting & Auslastung",
     hostingDesc:
-      "Überwacht App und Postgres. Ab ca. 70 % Auslastung erscheint eine Warnung, ab ca. 85 % eine dringende Empfehlung zum Upgrade bei Render.",
+      "Server, Datenbank und Render dieser Installation. Ab ca. 70 % Auslastung erscheint eine Warnung, ab ca. 85 % eine dringende Empfehlung zum Upgrade.",
+    hostingUsageTitle: "Besucher",
+    hostingUsageDesc:
+      "Personen, die heute angemeldet waren, und wie viele gerade gleichzeitig in der App sind.",
     hostingCheckedAt: "Zuletzt geprüft: {time}",
     hostingOverall: "Gesamtstatus",
     hostingAllOk: "Alles im grünen Bereich – kein Upgrade nötig.",

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { headers } from "next/headers";
+import { HostingHealthBanner } from "@/components/hosting-health-banner";
 import { getPlatformAdmin } from "@/lib/platform-auth";
 import { prisma } from "@/lib/prisma";
 
@@ -13,7 +14,9 @@ export default async function VereineLayout({
 
   const path = (await headers()).get("x-pathname") ?? "";
   const ticketsActive = path.startsWith("/vereine/tickets");
-  const clubsActive = path.startsWith("/vereine") && !ticketsActive;
+  const hostingActive = path.startsWith("/vereine/hosting");
+  const clubsActive =
+    path.startsWith("/vereine") && !ticketsActive && !hostingActive;
   const openForwards = await prisma.supportTicket.count({
     where: { forwardedAt: { not: null }, platformStatus: "OPEN" },
   });
@@ -21,7 +24,7 @@ export default async function VereineLayout({
   return (
     <div>
       <nav className="border-b border-border bg-card">
-        <div className="mx-auto flex max-w-3xl gap-2 px-4 py-3">
+        <div className="mx-auto flex max-w-6xl gap-2 px-4 py-3">
           <PlatformNavLink href="/vereine" active={clubsActive}>
             Vereine
           </PlatformNavLink>
@@ -39,8 +42,12 @@ export default async function VereineLayout({
               </span>
             ) : null}
           </PlatformNavLink>
+          <PlatformNavLink href="/vereine/hosting" active={hostingActive}>
+            Hosting
+          </PlatformNavLink>
         </div>
       </nav>
+      <HostingHealthBanner />
       {children}
     </div>
   );

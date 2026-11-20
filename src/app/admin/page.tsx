@@ -5,7 +5,6 @@ import { AdminRecentRegistrations } from "@/components/admin-recent-registration
 import { SectionFilter } from "@/components/section-filter";
 import { TogglePublishedButton } from "@/components/course-form";
 import { DeleteCourseButton } from "@/components/delete-course-button";
-import { HostingHealthBanner } from "@/components/hosting-health-banner";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -26,7 +25,7 @@ import { formatRegistrationDeadline, isRegistrationOpen } from "@/lib/courses";
 import { getServerI18n } from "@/lib/i18n";
 import type { TFunction } from "@/lib/i18n/types";
 import { externalPaymentDueCents } from "@/lib/payment-amounts";
-import { canAccessStaffAdmin, getManagedSectionIds } from "@/lib/permissions";
+import { getManagedSectionIds } from "@/lib/permissions";
 import { coursePriceSummary } from "@/lib/pricing";
 import { prisma } from "@/lib/prisma";
 import {
@@ -54,7 +53,6 @@ export default async function AdminPage({
   if (!user) redirect("/anmelden?next=/admin");
   const manager = await requireCourseManager();
   if (!manager) redirect("/admin/mitglieder");
-  const isStaffAdmin = await canAccessStaffAdmin(user);
   const managedIds =
     user.role === "ADMIN" ? null : await getManagedSectionIds(user.id);
   const [{ sektion }, sections] = await Promise.all([
@@ -141,7 +139,6 @@ export default async function AdminPage({
   const canCreate = managedIds === null || managedIds.length > 0;
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6">
-      {isStaffAdmin ? <HostingHealthBanner /> : null}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-4xl text-primary">{t("admin.coursesTitle")}</h1>
