@@ -90,11 +90,11 @@ export async function refundPaidCourtReservation(
         },
       });
     };
-    const cardPortionCents = (
+    const cardPortionCents = async (
       feeCents: number | null | undefined,
     ) => {
-      const resolved = resolveStripeFeeCents(externalCents, feeCents);
-      const payout = cashRefundPayoutCents({
+      const resolved = await resolveStripeFeeCents(externalCents, feeCents);
+      const payout = await cashRefundPayoutCents({
         paymentMethod: "STRIPE",
         externalCents,
         stripeFeeCents: resolved.feeCents,
@@ -106,7 +106,7 @@ export async function refundPaidCourtReservation(
     if (!reservation.stripeSessionId) {
       if (reservation.userId) {
         const booked = await bookFailedCardPortion(
-          cardPortionCents(reservation.stripeFeeCents),
+          await cardPortionCents(reservation.stripeFeeCents),
           reservation.stripeFeeCents,
         );
         cardRefundCreditedCents = booked.creditedCents;
@@ -120,7 +120,7 @@ export async function refundPaidCourtReservation(
           reservation.stripeFeeCents ??
           (await fetchStripeFeeFromCheckoutSession(reservation.stripeSessionId));
         attemptedFee = storedFee;
-        attemptedCents = cardPortionCents(storedFee);
+        attemptedCents = await cardPortionCents(storedFee);
         if (attemptedCents > 0) {
           await refundStripeCheckoutSession({
             sessionId: reservation.stripeSessionId,
@@ -136,7 +136,7 @@ export async function refundPaidCourtReservation(
         const fallbackCents =
           attemptedCents > 0
             ? attemptedCents
-            : cardPortionCents(reservation.stripeFeeCents);
+            : await cardPortionCents(reservation.stripeFeeCents);
         if (!reservation.userId) {
           if (fallbackCents > 0) throw error;
         } else {

@@ -154,7 +154,7 @@ export function PlanForm({
         </select>
         <p className="text-xs text-muted-foreground">
           Ordnet die Mitgliedschaft der Buchhaltung zu; Zahlung über die
-          Zahlungsdaten im Render Environment.
+          Zahlungsdaten in den Vereinseinstellungen des Betreibers.
         </p>
       </div>
       <div className="grid gap-2">

@@ -9,15 +9,25 @@ import {
 
 export function MembershipCardView({
   data,
+  clubName = "Sportverein",
+  logoUrl = null,
+  colors,
 }: {
   data: MembershipCardData;
+  clubName?: string;
+  logoUrl?: string | null;
+  colors?: { start: string; mid: string; end: string };
 }) {
+  const start = colors?.start ?? ASC_LAJEN.red;
+  const mid = colors?.mid ?? ASC_LAJEN.navy;
+  const end = colors?.end ?? ASC_LAJEN.green;
+  const mark = logoUrl || ASC_LOGOS.icon;
   return (
     <article
       className="membership-card overflow-hidden rounded-2xl text-white shadow-lg print:max-w-[380px] print:shadow-none"
       style={{
         maxWidth: 380,
-        background: `linear-gradient(160deg, ${ASC_LAJEN.red} 0%, ${ASC_LAJEN.navy} 55%, ${ASC_LAJEN.green} 100%)`,
+        background: `linear-gradient(160deg, ${start} 0%, ${mid} 55%, ${end} 100%)`,
         printColorAdjust: "exact",
         WebkitPrintColorAdjust: "exact",
       }}
@@ -25,7 +35,7 @@ export function MembershipCardView({
       <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3">
         <div>
           <p className="text-[11px] font-semibold tracking-[0.18em] uppercase opacity-90">
-            ASC Lajen Raiffeisen
+            {clubName}
           </p>
           <h2 className="mt-1 font-heading text-xl leading-tight sm:text-2xl">
             {data.cardTitle}
@@ -40,10 +50,11 @@ export function MembershipCardView({
           }}
         >
           <Image
-            src={ASC_LOGOS.icon}
+            src={mark}
             alt=""
             width={40}
             height={40}
+            unoptimized={Boolean(logoUrl)}
             className="size-10 object-contain"
           />
         </span>
@@ -57,13 +68,13 @@ export function MembershipCardView({
           WebkitPrintColorAdjust: "exact",
         }}
       >
-        <p className="font-heading text-xl" style={{ color: ASC_LAJEN.navy }}>
+        <p className="font-heading text-xl" style={{ color: mid }}>
           {data.name}
         </p>
         <p className="mt-1 text-sm" style={{ color: "#666666" }}>
           Nr. {data.memberNo} · geb. {formatBirthDate(data.birthDate)}
         </p>
-        <p className="mt-3 text-sm font-semibold" style={{ color: ASC_LAJEN.green }}>
+        <p className="mt-3 text-sm font-semibold" style={{ color: end }}>
           {data.planTitle}
         </p>
         <p className="mt-1 text-sm font-medium" style={{ color: "#151515" }}>

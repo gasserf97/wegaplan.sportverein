@@ -103,13 +103,15 @@ export async function saveMedicalCertificateFile(
   return saveEnrollmentDocumentFile(courseId, enrollmentId, file, "attests");
 }
 
-const EVENT_IMAGE_EXT: Record<string, string> = {
+const IMAGE_EXT: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
   "image/webp": ".webp",
 };
 
-function sniffEventImageMime(buffer: Buffer) {
+const LOGO_MAX_BYTES = 2 * 1024 * 1024;
+
+function sniffImageMime(buffer: Buffer) {
   if (
     buffer.length >= 3 &&
     buffer[0] === 0xff &&
@@ -137,17 +139,22 @@ function sniffEventImageMime(buffer: Buffer) {
   return null;
 }
 
-/** Speichert ein Hinweis-Bild. Der Ordner ist unabhängig von der Event-Id. */
-export async function saveClubEventImage(file: File) {
+async function saveSniffedImage(
+  file: File,
+  storageKeyBase: string,
+  maxBytes: number,
+  emptyMessage: string,
+  tooBigMessage: string,
+) {
   if (!file || file.size === 0) {
-    return { ok: false as const, error: "Bitte ein Bild auswählen." };
+    return { ok: false as const, error: emptyMessage };
   }
-  if (file.size > MAX_BYTES) {
-    return { ok: false as const, error: "Das Bild darf maximal 10 MB groß sein." };
+  if (file.size > maxBytes) {
+    return { ok: false as const, error: tooBigMessage };
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const mimeType = sniffEventImageMime(buffer);
+  const mimeType = sniffImageMime(buffer);
   if (!mimeType) {
     return { ok: false as const, error: "Erlaubt sind JPG, PNG oder WebP." };
   }
@@ -161,11 +168,7 @@ export async function saveClubEventImage(file: File) {
     return { ok: false as const, error: "Erlaubt sind JPG, PNG oder WebP." };
   }
 
-  const storageKey = path.posix.join(
-    "events",
-    randomUUID(),
-    `${randomUUID()}${EVENT_IMAGE_EXT[mimeType]}`,
-  );
+  const storageKey = `${storageKeyBase}${IMAGE_EXT[mimeType]}`;
   const absolutePath = path.join(uploadRootDir(), storageKey);
   await mkdir(path.dirname(absolutePath), { recursive: true });
   await writeFile(absolutePath, buffer);
@@ -176,6 +179,48 @@ export async function saveClubEventImage(file: File) {
     mimeType,
     sizeBytes: buffer.length,
   };
+}
+
+/** Speichert ein Hinweis-Bild. Der Ordner ist unabhängig von der Event-Id. */
+export async function saveClubEventImage(file: File) {
+  return saveSniffedImage(
+    file,
+    path.posix.join("events", randomUUID(), randomUUID()),
+    MAX_BYTES,
+    "Bitte ein Bild auswählen.",
+    "Das Bild darf maximal 10 MB groß sein.",
+  );
+}
+
+function clubImageKey(clubId: string, kind: "logo" | "stamp") {
+  if (!/^[a-zA-Z0-9_-]+$/.test(clubId)) return null;
+  return path.posix.join("club", clubId, `${kind}-${randomUUID()}`);
+}
+
+/** Speichert das Logo eines Vereins. Ersetzt die bisherige Datei nicht selbst. */
+export async function saveClubLogo(clubId: string, file: File) {
+  const key = clubImageKey(clubId, "logo");
+  if (!key) return { ok: false as const, error: "Kein Verein im Kontext." };
+  return saveSniffedImage(
+    file,
+    key,
+    LOGO_MAX_BYTES,
+    "Bitte ein Logo auswählen.",
+    "Das Logo darf maximal 2 MB groß sein.",
+  );
+}
+
+/** Speichert den Stempel eines Vereins. Ersetzt die bisherige Datei nicht selbst. */
+export async function saveClubStamp(clubId: string, file: File) {
+  const key = clubImageKey(clubId, "stamp");
+  if (!key) return { ok: false as const, error: "Kein Verein im Kontext." };
+  return saveSniffedImage(
+    file,
+    key,
+    LOGO_MAX_BYTES,
+    "Bitte einen Stempel auswählen.",
+    "Der Stempel darf maximal 2 MB groß sein.",
+  );
 }
 
 export async function readStoredFile(storageKey: string) {

@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
+import { getClubBrand } from "@/lib/club-brand";
 import { getPrivacyContent } from "@/lib/privacy-content";
 import { getServerI18n } from "@/lib/i18n";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { locale } = await getServerI18n();
-  const content = getPrivacyContent(locale);
+  const content = getPrivacyContent(locale, await getClubBrand());
   return {
     title: content.title,
     description: content.intro[0],
@@ -13,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function PrivacyPage() {
   const { locale } = await getServerI18n();
-  const content = getPrivacyContent(locale);
+  const content = getPrivacyContent(locale, await getClubBrand());
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-14 sm:px-6">

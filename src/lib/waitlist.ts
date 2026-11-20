@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { clubDisplayName } from "@/lib/club-settings";
 import { isSendableEmail, sendMail } from "@/lib/mail";
 import { formatDateTime } from "@/lib/format";
 import { getPublicAppUrl } from "@/lib/stripe";
@@ -91,9 +92,10 @@ export async function sendWaitlistPromotionEmail(input: {
     return { sent: false as const };
   }
 
+  const club = await clubDisplayName();
   const priceLabel = `${(input.priceCents / 100).toFixed(2).replace(".", ",")} €`;
   const expiresLabel = formatDateTime(input.expiresAt);
-  const subject = `Platz frei: ${input.courseTitle} – ASC Lajen`;
+  const subject = `Platz frei: ${input.courseTitle} – ${club}`;
   const text = [
     `Guten Tag${input.memberName ? ` ${input.memberName}` : ""},`,
     "",
@@ -103,7 +105,7 @@ export async function sendWaitlistPromotionEmail(input: {
     "",
     "Wenn Sie nicht rechtzeitig zahlen, wird der Platz an die nächste Person auf der Warteliste vergeben.",
     "",
-    "ASC Lajen Raiffeisen",
+    club,
   ].join("\n");
   const href = escapeHtml(input.offerUrl);
   const greetName = input.memberName ? ` ${escapeHtml(input.memberName)}` : "";
@@ -113,7 +115,7 @@ export async function sendWaitlistPromotionEmail(input: {
     `<p>Bitte sichern Sie ihn bis <strong>${escapeHtml(expiresLabel)}</strong> für <strong>${escapeHtml(priceLabel)}</strong>:</p>`,
     `<p><a href="${href}">Platz jetzt sichern</a></p>`,
     `<p>Wenn Sie nicht rechtzeitig zahlen, wird der Platz an die nächste Person auf der Warteliste vergeben.</p>`,
-    `<p>ASC Lajen Raiffeisen</p>`,
+    `<p>${escapeHtml(club)}</p>`,
   ].join("");
 
   const result = await sendMail({ to: input.to, subject, text, html });

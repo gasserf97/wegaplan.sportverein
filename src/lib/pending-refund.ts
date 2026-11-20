@@ -24,12 +24,12 @@ export type PendingRefundRow = {
 };
 
 /** Betrag, der nach Storno zurücküberwiesen werden soll. */
-export function cashRefundPayoutCents(input: {
+export async function cashRefundPayoutCents(input: {
   paymentMethod: PaymentMethod | null | undefined;
   externalCents: number;
   stripeFeeCents?: number | null;
   stripeSessionId?: string | null;
-}): { payoutCents: number; feeCents: number; estimated: boolean } {
+}): Promise<{ payoutCents: number; feeCents: number; estimated: boolean }> {
   const external = Math.max(0, input.externalCents);
   if (external <= 0) {
     return { payoutCents: 0, feeCents: 0, estimated: false };
@@ -42,7 +42,7 @@ export function cashRefundPayoutCents(input: {
     return { payoutCents: external, feeCents: 0, estimated: false };
   }
 
-  const { feeCents, estimated } = resolveStripeFeeCents(
+  const { feeCents, estimated } = await resolveStripeFeeCents(
     external,
     input.stripeFeeCents,
   );
@@ -100,7 +100,7 @@ export async function createPendingRefundTransfer(input: {
   // Nur wenn tatsächlich Geld zurücküberwiesen werden muss.
   if (external <= 0) return null;
 
-  const { payoutCents, feeCents } = cashRefundPayoutCents({
+  const { payoutCents, feeCents } = await cashRefundPayoutCents({
     paymentMethod: input.paymentMethod,
     externalCents: external,
     stripeFeeCents: input.stripeFeeCents,

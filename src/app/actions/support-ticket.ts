@@ -2,11 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { supportNotifyEmailSetting, clubDisplayName } from "@/lib/club-settings";
+import { requireCurrentClubId, platformBaseUrl } from "@/lib/tenant";
 import { getCurrentUser, requireAdmin } from "@/lib/auth";
 import { isMailConfigured, isSendableEmail, sendMail } from "@/lib/mail";
 import { CLUB_TIMEZONE } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import { getPublicAppUrl } from "@/lib/stripe";
+import { getAppUrl } from "@/lib/stripe";
 
 const ticketSchema = z.object({
   subject: z
@@ -24,8 +26,6 @@ const ticketSchema = z.object({
     .max(5000),
 });
 
-const TICKET_NOTIFY_EMAIL =
-  process.env.SUPPORT_TICKET_NOTIFY_EMAIL?.trim() || "fabian@wegaplan.com";
 const TICKET_DAY_TIMEZONE = CLUB_TIMEZONE;
 
 function calendarDayKey(date: Date, timeZone: string) {
@@ -55,6 +55,11 @@ function isUniqueConstraintError(error: unknown) {
 }
 
 /** Beansprucht den Tages-Slot für die Benachrichtigung (einmal pro Kalendertag). */
+async function ticketDayKey(date: Date) {
+  const clubId = await requireCurrentClubId();
+  return `${clubId}:${calendarDayKey(date, TICKET_DAY_TIMEZONE)}`;
+}
+
 async function claimDailyTicketNotifySlot(dayKey: string, ticketId: string) {
   try {
     await prisma.supportTicketDailyNotify.create({
@@ -83,7 +88,7 @@ async function notifyFirstSupportTicketOfDay(input: {
   username: string;
   createdAt: Date;
 }) {
-  const dayKey = calendarDayKey(input.createdAt, TICKET_DAY_TIMEZONE);
+  const dayKey = await ticketDayKey(input.createdAt);
   // Test-Hatch: Betreff mit [Force-Notify] gibt den Tages-Slot wieder frei (nur zum Prüfen).
   if (input.subject.trim().startsWith("[Force-Notify]")) {
     await releaseDailyTicketNotifySlot(dayKey);
@@ -109,14 +114,16 @@ async function notifyFirstSupportTicketOfDay(input: {
     return;
   }
 
-  if (!isMailConfigured()) {
+  const notifyTo = await supportNotifyEmailSetting();
+  const club = await clubDisplayName();
+  if (!(await isMailConfigured()) || !notifyTo) {
     console.warn("Ticket-Benachrichtigung: E-Mail nicht konfiguriert.");
     if (markerAvailable) await releaseDailyTicketNotifySlot(dayKey);
     return;
   }
 
-  const ticketsUrl = `${getPublicAppUrl()}/admin/tickets`;
-  const subject = "ASC Lajen – neues Support-Ticket";
+  const ticketsUrl = `${await getAppUrl()}/admin/tickets`;
+  const subject = `${club} – neues Support-Ticket`;
   const preview =
     input.message.length > 280
       ? `${input.message.slice(0, 277)}…`
@@ -135,7 +142,7 @@ async function notifyFirstSupportTicketOfDay(input: {
     "",
     "Weitere Tickets am selben Tag lösen keine zusätzliche E-Mail aus.",
     "",
-    "ASC Lajen Raiffeisen",
+    club,
   ].join("\n");
   const href = ticketsUrl.replace(/&/g, "&amp;");
   const html = [
@@ -146,11 +153,11 @@ async function notifyFirstSupportTicketOfDay(input: {
     `<p>${escapeHtml(preview).replace(/\n/g, "<br/>")}</p>`,
     `<p><a href="${href}">Tickets im Admin öffnen</a></p>`,
     "<p>Weitere Tickets am selben Tag lösen keine zusätzliche E-Mail aus.</p>",
-    "<p>ASC Lajen Raiffeisen</p>",
+    `<p>${club}</p>`,
   ].join("");
 
   const result = await sendMail({
-    to: TICKET_NOTIFY_EMAIL,
+    to: notifyTo,
     subject,
     text,
     html,
@@ -166,7 +173,7 @@ async function notifyFirstSupportTicketOfDay(input: {
 
   console.info(
     "Ticket-Benachrichtigung gesendet an",
-    TICKET_NOTIFY_EMAIL,
+    notifyTo,
     dayKey,
     input.ticketId,
   );
@@ -205,6 +212,7 @@ export async function createSupportTicketAction(
 
   const ticket = await prisma.supportTicket.create({
     data: {
+      clubId: await requireCurrentClubId(),
       subject: parsed.data.subject,
       message: parsed.data.message,
       userId: user.id,
@@ -240,7 +248,7 @@ async function notifyTicketClosed(input: {
   subject: string;
   message: string;
 }) {
-  if (!isMailConfigured()) {
+  if (!(await isMailConfigured())) {
     console.warn("Ticket-Schließung: E-Mail nicht konfiguriert.");
     return;
   }
@@ -252,7 +260,8 @@ async function notifyTicketClosed(input: {
     return;
   }
 
-  const subject = `ASC Lajen – Ihr Ticket wurde geschlossen: ${input.subject}`;
+  const club = await clubDisplayName();
+  const subject = `${club} – Ihr Ticket wurde geschlossen: ${input.subject}`;
   const text = [
     `Guten Tag ${input.memberName},`,
     "",
@@ -265,7 +274,7 @@ async function notifyTicketClosed(input: {
     "Falls Sie dazu noch Fragen haben, können Sie jederzeit ein neues Ticket erstellen.",
     "",
     "Mit freundlichen Grüßen",
-    "ASC Lajen Raiffeisen",
+    club,
   ].join("\n");
   const html = [
     `<p>Guten Tag ${escapeHtml(input.memberName)},</p>`,
@@ -273,7 +282,7 @@ async function notifyTicketClosed(input: {
     `<p><strong>Betreff:</strong> ${escapeHtml(input.subject)}</p>`,
     `<p style="color:#666;font-size:13px;">${escapeHtml(input.message).replace(/\n/g, "<br/>")}</p>`,
     "<p>Falls Sie dazu noch Fragen haben, können Sie jederzeit ein neues Ticket erstellen.</p>",
-    "<p>Mit freundlichen Grüßen<br/>ASC Lajen Raiffeisen</p>",
+    `<p>Mit freundlichen Grüßen<br/>${club}</p>`,
   ].join("");
 
   const result = await sendMail({
@@ -356,6 +365,142 @@ export async function updateSupportTicketStatusAction(
   return { ok: true };
 }
 
+const forwardSchema = z.object({
+  ticketId: z.string().min(1),
+  note: z
+    .string()
+    .trim()
+    .max(2000, { error: "Der Hinweis darf höchstens 2000 Zeichen haben." }),
+});
+
+export type ForwardSupportTicketState =
+  | { error: string }
+  | { ok: true }
+  | null;
+
+async function notifyPlatformOfForwardedTicket(input: {
+  clubName: string;
+  adminName: string;
+  memberName: string;
+  memberEmail: string;
+  subject: string;
+  message: string;
+  note: string;
+}) {
+  const recipients = (
+    await prisma.platformAdmin.findMany({ select: { email: true } })
+  )
+    .map((admin) => admin.email)
+    .filter((email) => isSendableEmail(email));
+  if (recipients.length === 0 || !(await isMailConfigured())) return;
+
+  const ticketsUrl = `${await platformBaseUrl()}/vereine/tickets`;
+  const subject = `wegaPlan – Ticket von ${input.clubName}: ${input.subject}`;
+  const noteBlock = input.note
+    ? ["", "Hinweis des Vereins:", input.note]
+    : [];
+  const text = [
+    "Guten Tag,",
+    "",
+    "ein Verein hat ein Support-Ticket an wegaPlan weitergeleitet.",
+    "",
+    `Verein: ${input.clubName}`,
+    `Weitergeleitet von: ${input.adminName}`,
+    `Mitglied: ${input.memberName} (${input.memberEmail})`,
+    `Betreff: ${input.subject}`,
+    "",
+    input.message,
+    ...noteBlock,
+    "",
+    `Tickets öffnen: ${ticketsUrl}`,
+  ].join("\n");
+  const href = ticketsUrl.replace(/&/g, "&amp;");
+  const html = [
+    "<p>Guten Tag,</p>",
+    "<p>ein Verein hat ein Support-Ticket an wegaPlan weitergeleitet.</p>",
+    `<p><strong>Verein:</strong> ${escapeHtml(input.clubName)}<br/>`,
+    `<strong>Weitergeleitet von:</strong> ${escapeHtml(input.adminName)}<br/>`,
+    `<strong>Mitglied:</strong> ${escapeHtml(input.memberName)} (${escapeHtml(input.memberEmail)})<br/>`,
+    `<strong>Betreff:</strong> ${escapeHtml(input.subject)}</p>`,
+    `<p>${escapeHtml(input.message).replace(/\n/g, "<br/>")}</p>`,
+    input.note
+      ? `<p><strong>Hinweis des Vereins:</strong><br/>${escapeHtml(input.note).replace(/\n/g, "<br/>")}</p>`
+      : "",
+    `<p><a href="${href}">Weitergeleitete Tickets öffnen</a></p>`,
+  ].join("");
+
+  for (const to of recipients) {
+    const result = await sendMail({ to, subject, text, html });
+    if (!result.sent) {
+      console.error(
+        "Ticket-Weiterleitung",
+        to,
+        "message" in result ? result.message : "",
+      );
+    }
+  }
+}
+
+export async function forwardSupportTicketAction(
+  _prev: ForwardSupportTicketState,
+  formData: FormData,
+): Promise<ForwardSupportTicketState> {
+  const admin = await requireAdmin();
+  if (!admin) {
+    return { error: "Keine Berechtigung." };
+  }
+
+  const parsed = forwardSchema.safeParse({
+    ticketId: String(formData.get("ticketId") ?? ""),
+    note: String(formData.get("note") ?? ""),
+  });
+  if (!parsed.success) {
+    return {
+      error: parsed.error.issues[0]?.message ?? "Ungültige Angaben.",
+    };
+  }
+
+  const ticket = await prisma.supportTicket.findUnique({
+    where: { id: parsed.data.ticketId },
+    include: {
+      user: { select: { name: true, email: true } },
+      club: { select: { name: true } },
+    },
+  });
+  if (!ticket) {
+    return { error: "Ticket nicht gefunden." };
+  }
+
+  await prisma.supportTicket.update({
+    where: { id: ticket.id },
+    data: {
+      forwardedAt: new Date(),
+      forwardedById: admin.id,
+      forwardNote: parsed.data.note,
+      platformStatus: "OPEN",
+      platformClosedAt: null,
+    },
+  });
+
+  try {
+    await notifyPlatformOfForwardedTicket({
+      clubName: ticket.club.name,
+      adminName: admin.name,
+      memberName: ticket.user.name,
+      memberEmail: ticket.user.email,
+      subject: ticket.subject,
+      message: ticket.message,
+      note: parsed.data.note,
+    });
+  } catch (error) {
+    console.error("Ticket-Weiterleitung", error);
+  }
+
+  revalidatePath("/admin/tickets");
+  revalidatePath("/vereine/tickets");
+  return { ok: true };
+}
+
 const replySchema = z.object({
   ticketId: z.string().min(1),
   body: z
@@ -399,7 +544,7 @@ export async function replySupportTicketAction(
     return { error: "Ticket nicht gefunden." };
   }
 
-  if (!isMailConfigured()) {
+  if (!(await isMailConfigured())) {
     return { error: "E-Mail-Versand ist nicht konfiguriert." };
   }
 
@@ -411,7 +556,8 @@ export async function replySupportTicketAction(
   }
 
   const replyBody = parsed.data.body;
-  const subject = `ASC Lajen – Antwort auf Ihr Ticket: ${ticket.subject}`;
+  const club = await clubDisplayName();
+  const subject = `${club} – Antwort auf Ihr Ticket: ${ticket.subject}`;
   const text = [
     `Guten Tag ${ticket.user.name},`,
     "",
@@ -422,7 +568,7 @@ export async function replySupportTicketAction(
     ticket.message,
     "",
     "Mit freundlichen Grüßen",
-    `${admin.name} – ASC Lajen Raiffeisen`,
+    `${admin.name} – ${club}`,
   ].join("\n");
   const html = [
     `<p>Guten Tag ${escapeHtml(ticket.user.name)},</p>`,
@@ -430,7 +576,7 @@ export async function replySupportTicketAction(
     "<hr/>",
     `<p style="color:#666;font-size:13px;"><strong>Ihr ursprüngliches Ticket:</strong> ${escapeHtml(ticket.subject)}<br/>`,
     `${escapeHtml(ticket.message).replace(/\n/g, "<br/>")}</p>`,
-    `<p>Mit freundlichen Grüßen<br/>${escapeHtml(admin.name)} – ASC Lajen Raiffeisen</p>`,
+    `<p>Mit freundlichen Grüßen<br/>${escapeHtml(admin.name)} – ${escapeHtml(club)}</p>`,
   ].join("");
 
   const result = await sendMail({

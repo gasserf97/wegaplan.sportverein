@@ -25,9 +25,17 @@ export function isValidStripeSecretKey(key: string) {
  * akzeptiert nur die offizielle Testkarte. Liegt ein sk_test_/sk_live_-Schlüssel,
  * geht die Zahlung an dieses Stripe-Konto.
  */
-export function isStripeDemoMode() {
+export async function isStripeDemoMode() {
+  const { clubShowcaseMode } = await import("@/lib/club-settings");
+  const { listAllStripeSecretKeys } = await import("@/lib/section-payments");
+  const clubMode = await clubShowcaseMode();
+  const keys = await listAllStripeSecretKeys();
+  const hasRealKey = keys.some((key) => isValidStripeSecretKey(key));
+  if (clubMode === true) return !hasRealKey;
+  if (clubMode === false) return false;
   if (cleanStripeEnv(process.env.SHOWCASE_MODE) !== "1") return false;
   if (getGlobalStripeSecretKey()) return false;
+  if (hasRealKey) return false;
   for (const [name, value] of Object.entries(process.env)) {
     if (!name.endsWith("STRIPE_SECRET_KEY")) continue;
     if (isValidStripeSecretKey(value ?? "")) return false;
@@ -58,7 +66,7 @@ export function isStripeConfigured() {
 }
 
 export const stripeCheckoutUnavailableError =
-  "Kartenzahlung ist für diese Sektion nicht eingerichtet. Bitte Überweisung wählen oder den Verein informieren (Render Environment → PAYMENT_<KEY>_STRIPE_SECRET_KEY).";
+  "Kartenzahlung ist für diese Sektion nicht eingerichtet. Bitte Überweisung wählen oder den Verein informieren.";
 
 const cachedByKey = new Map<string, Stripe>();
 
@@ -165,24 +173,27 @@ function normalizeBaseUrl(raw: string) {
 }
 
 export async function getAppUrl() {
-  const fromEnv = normalizeBaseUrl(
-    process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || "",
-  );
-  if (fromEnv && !isLocalHost(fromEnv)) return fromEnv;
-
   try {
     const headerList = await headers();
     const host = cleanStripeEnv(
-      headerList.get("x-forwarded-host") ?? headerList.get("host"),
+      headerList.get("x-club-host") ??
+        headerList.get("x-forwarded-host") ??
+        headerList.get("host"),
     );
-    if (host && !isLocalHost(host)) {
-      const proto = cleanStripeEnv(headerList.get("x-forwarded-proto")) || "https";
+    if (host) {
+      const local = isLocalHost(host);
+      const proto = local
+        ? "http"
+        : cleanStripeEnv(headerList.get("x-forwarded-proto")) || "https";
       return `${proto}://${host}`;
     }
   } catch {
     // outside a request
   }
 
+  const fromEnv = normalizeBaseUrl(
+    process.env.NEXT_PUBLIC_APP_URL || process.env.RENDER_EXTERNAL_URL || "",
+  );
   if (fromEnv) return fromEnv;
   return "http://127.0.0.1:4521";
 }

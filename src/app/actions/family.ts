@@ -30,6 +30,7 @@ import {
   usernameCandidateFromEmail,
 } from "@/lib/username";
 import { prisma } from "@/lib/prisma";
+import { requireCurrentClubId } from "@/lib/tenant";
 
 export type FamilyDraftFields = {
   name: string;
@@ -258,7 +259,7 @@ export async function addFamilyMemberAction(
 
   if (noPlatformAccess) {
     username = generatedNoLoginUsername();
-    while (await prisma.user.findUnique({ where: { username } })) {
+    while (await prisma.user.findFirst({ where: { username } })) {
       username = generatedNoLoginUsername();
     }
     passwordHash = await hash(randomBytes(32).toString("hex"), 10);
@@ -281,6 +282,7 @@ export async function addFamilyMemberAction(
 
   const created = await prisma.user.create({
     data: {
+      clubId: await requireCurrentClubId(),
       username,
       name: fullName,
       email,

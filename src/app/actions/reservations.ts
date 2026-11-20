@@ -3,6 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { requireCurrentClubId } from "@/lib/tenant";
 import { getCurrentUser, requireAdmin } from "@/lib/auth";
 import {
   BOOKING,
@@ -639,6 +640,7 @@ export async function createCourtAction(
 
   await prisma.court.create({
     data: {
+      clubId: await requireCurrentClubId(),
       name,
       category,
       priceCentsPerHour: Math.round(euros * 100),

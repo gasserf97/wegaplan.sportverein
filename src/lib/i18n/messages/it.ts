@@ -28,11 +28,12 @@ export const it = {
     adminSubscriptions: "Abbonamenti",
     adminAccounting: "Contabilità",
     adminMembers: "Membri",
+    adminClub: "Società",
     adminSections: "Sezioni",
     adminCourts: "Campi da tennis",
     adminFleet: "Parco veicoli",
     adminTickets: "Ticket",
-    adminHosting: "Hosting",
+    adminHosting: "Visitatori",
     adminEvents: "Eventi",
   },
 
@@ -866,7 +867,10 @@ export const it = {
     accessDeniedLink: "Torna all'admin",
     hostingTitle: "Hosting e utilizzo",
     hostingDesc:
-      "Monitora app e Postgres. Circa dal 70 % di utilizzo compare un avviso, dal 85 % un consiglio urgente di upgrade su Render.",
+      "Server, database e Render di questa installazione. Circa dal 70 % di utilizzo compare un avviso, dal 85 % un consiglio urgente di upgrade.",
+    hostingUsageTitle: "Visitatori",
+    hostingUsageDesc:
+      "Persone che hanno effettuato l’accesso oggi e quante sono in linea nello stesso momento.",
     hostingCheckedAt: "Ultimo controllo: {time}",
     hostingOverall: "Stato generale",
     hostingAllOk: "Tutto a posto – nessun upgrade necessario.",
@@ -1025,6 +1029,20 @@ export const it = {
     ticketReplyBody: "Messaggio",
     ticketReplySend: "Invia per e-mail",
     ticketReplySent: "Risposta inviata per e-mail.",
+    ticketForward: "Inoltra a wegaPlan",
+    ticketForwardAgain: "Inoltra di nuovo a wegaPlan",
+    ticketForwardTitle: "Inoltra a wegaPlan",
+    ticketForwardHint:
+      "Il ticket compare dal gestore. Il socio non viene avvisato.",
+    ticketForwardAgainHint:
+      "Il ticket è già da wegaPlan. Un nuovo invio lo riapre lì.",
+    ticketForwardNote: "Nota per wegaPlan (facoltativa)",
+    ticketForwardSend: "Inoltra",
+    ticketForwardSent: "Inoltrato a wegaPlan.",
+    ticketForwarded: "Inoltrato a wegaPlan",
+    ticketForwardDone: "wegaPlan l’ha evaso",
+    ticketPlatformReply: "Risposta di wegaPlan",
+    ticketPlatformReplyBy: "da {name}",
   },
 
   pwa: {

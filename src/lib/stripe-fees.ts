@@ -1,3 +1,4 @@
+import { stripeFeeSetting } from "@/lib/club-settings";
 import { isStripeConfigured, withStripeAccounts } from "@/lib/stripe";
 import { listAllStripeSecretKeys } from "@/lib/section-payments";
 
@@ -6,9 +7,14 @@ export type StripeFeeConfig = {
   fixedCents: number;
 };
 
-export function getStripeFeeConfig(): StripeFeeConfig {
-  const percent = Number(process.env.STRIPE_FEE_PERCENT ?? "1.5");
-  const fixedCents = Number(process.env.STRIPE_FEE_FIXED_CENTS ?? "25");
+export async function getStripeFeeConfig(): Promise<StripeFeeConfig> {
+  const setting = await stripeFeeSetting();
+  const percent = Number(
+    setting.percent ?? process.env.STRIPE_FEE_PERCENT ?? "1.5",
+  );
+  const fixedCents = Number(
+    setting.fixedCents ?? process.env.STRIPE_FEE_FIXED_CENTS ?? "25",
+  );
   return {
     percent: Number.isFinite(percent) ? percent : 1.5,
     fixedCents: Number.isFinite(fixedCents) ? fixedCents : 25,
@@ -16,9 +22,9 @@ export function getStripeFeeConfig(): StripeFeeConfig {
 }
 
 /** Geschätzte Stripe-Gebühr (Standard: 1,5 % + 0,25 € pro Kartenzahlung in EUR). */
-export function estimateStripeFeeCents(amountCents: number): number {
+export async function estimateStripeFeeCents(amountCents: number): Promise<number> {
   if (amountCents <= 0) return 0;
-  const { percent, fixedCents } = getStripeFeeConfig();
+  const { percent, fixedCents } = await getStripeFeeConfig();
   return Math.round(amountCents * (percent / 100) + fixedCents);
 }
 
@@ -140,10 +146,10 @@ export async function fetchStripeFeeFromInvoice(
   }
 }
 
-export function resolveStripeFeeCents(
+export async function resolveStripeFeeCents(
   externalAmountCents: number,
   storedFeeCents: number | null | undefined,
-): { feeCents: number; estimated: boolean } {
+): Promise<{ feeCents: number; estimated: boolean }> {
   if (externalAmountCents <= 0) {
     return { feeCents: 0, estimated: false };
   }
@@ -151,7 +157,7 @@ export function resolveStripeFeeCents(
     return { feeCents: storedFeeCents, estimated: false };
   }
   return {
-    feeCents: estimateStripeFeeCents(externalAmountCents),
+    feeCents: await estimateStripeFeeCents(externalAmountCents),
     estimated: true,
   };
 }
@@ -167,7 +173,7 @@ export async function resolveCheckoutSessionStripeFees(
   const totalExternal = billable.reduce((sum, part) => sum + part.externalCents, 0);
   const fetched = await fetchStripeFeeFromCheckoutSession(sessionId);
   const estimated = fetched == null;
-  const totalFee = fetched ?? estimateStripeFeeCents(totalExternal);
+  const totalFee = fetched ?? (await estimateStripeFeeCents(totalExternal));
   const allocated = allocateStripeFeeCents(
     totalFee,
     billable.map((part) => ({ key: part.key, amountCents: part.externalCents })),

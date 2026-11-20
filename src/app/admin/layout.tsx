@@ -71,6 +71,11 @@ export default async function AdminLayout({
               <AdminNavLink href="/admin/tickets">
                 {t("nav.adminTickets")}
               </AdminNavLink>
+              {user.role === "ADMIN" ? (
+                <AdminNavLink href="/admin/verein">
+                  {t("nav.adminClub")}
+                </AdminNavLink>
+              ) : null}
               <AdminNavLink href="/admin/sektionen">
                 {t("nav.adminSections")}
               </AdminNavLink>

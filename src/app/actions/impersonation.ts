@@ -2,11 +2,16 @@
 
 import { redirect } from "next/navigation";
 import {
+  clearSessionCookie,
   getSessionImpersonatorId,
+  getSessionPlatformImpersonatorId,
   requireAdmin,
   setSessionCookie,
 } from "@/lib/auth";
+import { CLUB_PREVIEW_COOKIE } from "@/lib/host";
+import { platformBaseUrl } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
+import { cookies } from "next/headers";
 
 export type ImpersonationState =
   | { error: string }
@@ -70,6 +75,14 @@ export async function startImpersonationAction(
 }
 
 export async function stopImpersonationAction(): Promise<ImpersonationState> {
+  const platformAdminId = await getSessionPlatformImpersonatorId();
+  if (platformAdminId) {
+    await clearSessionCookie();
+    const store = await cookies();
+    store.delete({ name: CLUB_PREVIEW_COOKIE, path: "/" });
+    redirect(`${await platformBaseUrl()}/vereine`);
+  }
+
   const impersonatorId = await getSessionImpersonatorId();
   if (!impersonatorId) {
     return { error: "Keine aktive Simulation." };

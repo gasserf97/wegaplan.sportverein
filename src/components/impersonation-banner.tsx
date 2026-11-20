@@ -7,8 +7,10 @@ import { useI18n } from "@/components/locale-provider";
 
 export function ImpersonationBanner({
   targetName,
+  mode = "member",
 }: {
   targetName: string;
+  mode?: "member" | "platform";
 }) {
   const { t } = useI18n();
   const [pending, start] = useTransition();
@@ -20,8 +22,12 @@ export function ImpersonationBanner({
     >
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <p className="text-sm leading-6">
-          <strong className="font-semibold">{t("impersonation.bannerTitle")}</strong>{" "}
-          {t("impersonation.bannerText", { name: targetName })}
+          <strong className="font-semibold">
+            {mode === "platform" ? "Vereins-Admin" : t("impersonation.bannerTitle")}
+          </strong>{" "}
+          {mode === "platform"
+            ? `Sie sind als ${targetName} angemeldet.`
+            : t("impersonation.bannerText", { name: targetName })}
         </p>
         <Button
           type="button"

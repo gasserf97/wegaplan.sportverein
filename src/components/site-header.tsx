@@ -114,12 +114,18 @@ export function SiteHeader({
   showFleet = false,
   homeHref = "/",
   lockNavigation = false,
+  clubName = "Sportverein",
+  showWordmark = false,
+  clubLogoUrl = null,
 }: {
   user: SessionUser | null;
   showAdmin?: boolean;
   showFleet?: boolean;
   homeHref?: string;
   lockNavigation?: boolean;
+  clubName?: string;
+  showWordmark?: boolean;
+  clubLogoUrl?: string | null;
 }) {
   const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -132,15 +138,21 @@ export function SiteHeader({
         <Link
           href={homeHref}
           className="flex shrink-0 items-center gap-2 sm:gap-3"
-          aria-label="ASC Lajen Raiffeisen"
+          aria-label={clubName}
         >
-          <ClubLogo variant="icon" href={null} priority />
-          <ClubLogo
-            variant="wordmark"
-            href={null}
-            priority
-            className="hidden h-8 lg:block lg:h-9"
-          />
+          <ClubLogo variant="icon" href={null} priority src={clubLogoUrl} />
+          {showWordmark ? (
+            <ClubLogo
+              variant="wordmark"
+              href={null}
+              priority
+              className="hidden h-8 lg:block lg:h-9"
+            />
+          ) : (
+            <span className="hidden font-heading text-sm font-semibold sm:inline">
+              {clubName}
+            </span>
+          )}
         </Link>
 
         {!lockNavigation ? (
@@ -199,7 +211,7 @@ export function SiteHeader({
             </SheetTrigger>
             <SheetContent side="right" className="w-72">
               <SheetHeader>
-                <SheetTitle className="sr-only">ASC Lajen</SheetTitle>
+                <SheetTitle className="sr-only">{clubName}</SheetTitle>
                 <ClubLogo variant="wordmark" href={null} className="h-8" />
               </SheetHeader>
               <div className="flex flex-col gap-4 px-4 pb-6">

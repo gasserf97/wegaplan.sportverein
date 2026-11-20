@@ -9,6 +9,7 @@ import { formChecked, formText } from "@/lib/form-draft";
 import { parseEuroToCents } from "@/lib/format";
 import { canManagePlan, canManageSection } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { requireCurrentClubId } from "@/lib/tenant";
 import { canActFor } from "@/lib/family";
 import {
   isStripeSubscriptionGone,
@@ -344,6 +345,7 @@ export async function createPlanAction(
 
   await prisma.subscriptionPlan.create({
     data: {
+      clubId: await requireCurrentClubId(),
       ...parsed.data,
       createdById: manager.id,
     },
