@@ -1058,6 +1058,20 @@ export const de = {
     ticketReplyBody: "Nachricht",
     ticketReplySend: "Per E-Mail senden",
     ticketReplySent: "Antwort wurde per E-Mail gesendet.",
+    ticketForward: "An wegaPlan weiterleiten",
+    ticketForwardAgain: "Erneut an wegaPlan",
+    ticketForwardTitle: "An wegaPlan weiterleiten",
+    ticketForwardHint:
+      "Das Ticket erscheint beim Betreiber. Das Mitglied wird nicht benachrichtigt.",
+    ticketForwardAgainHint:
+      "Das Ticket liegt bereits bei wegaPlan. Ein erneutes Senden setzt es dort wieder auf offen.",
+    ticketForwardNote: "Hinweis für wegaPlan (optional)",
+    ticketForwardSend: "Weiterleiten",
+    ticketForwardSent: "An wegaPlan weitergeleitet.",
+    ticketForwarded: "An wegaPlan weitergeleitet",
+    ticketForwardDone: "wegaPlan hat es erledigt",
+    ticketPlatformReply: "Antwort von wegaPlan",
+    ticketPlatformReplyBy: "von {name}",
   },
 
   pwa: {

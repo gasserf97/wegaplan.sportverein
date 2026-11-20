@@ -1026,6 +1026,20 @@ export const it = {
     ticketReplyBody: "Messaggio",
     ticketReplySend: "Invia per e-mail",
     ticketReplySent: "Risposta inviata per e-mail.",
+    ticketForward: "Inoltra a wegaPlan",
+    ticketForwardAgain: "Inoltra di nuovo a wegaPlan",
+    ticketForwardTitle: "Inoltra a wegaPlan",
+    ticketForwardHint:
+      "Il ticket compare dal gestore. Il socio non viene avvisato.",
+    ticketForwardAgainHint:
+      "Il ticket è già da wegaPlan. Un nuovo invio lo riapre lì.",
+    ticketForwardNote: "Nota per wegaPlan (facoltativa)",
+    ticketForwardSend: "Inoltra",
+    ticketForwardSent: "Inoltrato a wegaPlan.",
+    ticketForwarded: "Inoltrato a wegaPlan",
+    ticketForwardDone: "wegaPlan l’ha evaso",
+    ticketPlatformReply: "Risposta di wegaPlan",
+    ticketPlatformReplyBy: "da {name}",
   },
 
   pwa: {

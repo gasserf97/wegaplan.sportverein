@@ -28,6 +28,10 @@ export default async function AdminTicketsPage() {
       closedBy: {
         select: { name: true, username: true },
       },
+      platformReplies: {
+        orderBy: { createdAt: "asc" },
+        select: { id: true, body: true, authorName: true, createdAt: true },
+      },
     },
   });
 
@@ -40,6 +44,15 @@ export default async function AdminTicketsPage() {
     closedAt: ticket.closedAt?.toISOString() ?? null,
     closedBy: ticket.closedBy,
     user: ticket.user,
+    forwardedAt: ticket.forwardedAt?.toISOString() ?? null,
+    forwardNote: ticket.forwardNote,
+    platformStatus: ticket.platformStatus,
+    platformReplies: ticket.platformReplies.map((reply) => ({
+      id: reply.id,
+      body: reply.body,
+      authorName: reply.authorName,
+      createdAt: reply.createdAt.toISOString(),
+    })),
   }));
 
   const openTickets = rows.filter((ticket) => ticket.status === "OPEN");

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { supportNotifyEmailSetting, clubDisplayName } from "@/lib/club-settings";
-import { requireCurrentClubId } from "@/lib/tenant";
+import { requireCurrentClubId, platformBaseUrl } from "@/lib/tenant";
 import { getCurrentUser, requireAdmin } from "@/lib/auth";
 import { isMailConfigured, isSendableEmail, sendMail } from "@/lib/mail";
 import { CLUB_TIMEZONE } from "@/lib/format";
@@ -362,6 +362,142 @@ export async function updateSupportTicketStatusAction(
   }
 
   revalidatePath("/admin/tickets");
+  return { ok: true };
+}
+
+const forwardSchema = z.object({
+  ticketId: z.string().min(1),
+  note: z
+    .string()
+    .trim()
+    .max(2000, { error: "Der Hinweis darf höchstens 2000 Zeichen haben." }),
+});
+
+export type ForwardSupportTicketState =
+  | { error: string }
+  | { ok: true }
+  | null;
+
+async function notifyPlatformOfForwardedTicket(input: {
+  clubName: string;
+  adminName: string;
+  memberName: string;
+  memberEmail: string;
+  subject: string;
+  message: string;
+  note: string;
+}) {
+  const recipients = (
+    await prisma.platformAdmin.findMany({ select: { email: true } })
+  )
+    .map((admin) => admin.email)
+    .filter((email) => isSendableEmail(email));
+  if (recipients.length === 0 || !(await isMailConfigured())) return;
+
+  const ticketsUrl = `${await platformBaseUrl()}/vereine/tickets`;
+  const subject = `wegaPlan – Ticket von ${input.clubName}: ${input.subject}`;
+  const noteBlock = input.note
+    ? ["", "Hinweis des Vereins:", input.note]
+    : [];
+  const text = [
+    "Guten Tag,",
+    "",
+    "ein Verein hat ein Support-Ticket an wegaPlan weitergeleitet.",
+    "",
+    `Verein: ${input.clubName}`,
+    `Weitergeleitet von: ${input.adminName}`,
+    `Mitglied: ${input.memberName} (${input.memberEmail})`,
+    `Betreff: ${input.subject}`,
+    "",
+    input.message,
+    ...noteBlock,
+    "",
+    `Tickets öffnen: ${ticketsUrl}`,
+  ].join("\n");
+  const href = ticketsUrl.replace(/&/g, "&amp;");
+  const html = [
+    "<p>Guten Tag,</p>",
+    "<p>ein Verein hat ein Support-Ticket an wegaPlan weitergeleitet.</p>",
+    `<p><strong>Verein:</strong> ${escapeHtml(input.clubName)}<br/>`,
+    `<strong>Weitergeleitet von:</strong> ${escapeHtml(input.adminName)}<br/>`,
+    `<strong>Mitglied:</strong> ${escapeHtml(input.memberName)} (${escapeHtml(input.memberEmail)})<br/>`,
+    `<strong>Betreff:</strong> ${escapeHtml(input.subject)}</p>`,
+    `<p>${escapeHtml(input.message).replace(/\n/g, "<br/>")}</p>`,
+    input.note
+      ? `<p><strong>Hinweis des Vereins:</strong><br/>${escapeHtml(input.note).replace(/\n/g, "<br/>")}</p>`
+      : "",
+    `<p><a href="${href}">Weitergeleitete Tickets öffnen</a></p>`,
+  ].join("");
+
+  for (const to of recipients) {
+    const result = await sendMail({ to, subject, text, html });
+    if (!result.sent) {
+      console.error(
+        "Ticket-Weiterleitung",
+        to,
+        "message" in result ? result.message : "",
+      );
+    }
+  }
+}
+
+export async function forwardSupportTicketAction(
+  _prev: ForwardSupportTicketState,
+  formData: FormData,
+): Promise<ForwardSupportTicketState> {
+  const admin = await requireAdmin();
+  if (!admin) {
+    return { error: "Keine Berechtigung." };
+  }
+
+  const parsed = forwardSchema.safeParse({
+    ticketId: String(formData.get("ticketId") ?? ""),
+    note: String(formData.get("note") ?? ""),
+  });
+  if (!parsed.success) {
+    return {
+      error: parsed.error.issues[0]?.message ?? "Ungültige Angaben.",
+    };
+  }
+
+  const ticket = await prisma.supportTicket.findUnique({
+    where: { id: parsed.data.ticketId },
+    include: {
+      user: { select: { name: true, email: true } },
+      club: { select: { name: true } },
+    },
+  });
+  if (!ticket) {
+    return { error: "Ticket nicht gefunden." };
+  }
+
+  await prisma.supportTicket.update({
+    where: { id: ticket.id },
+    data: {
+      forwardedAt: new Date(),
+      forwardedById: admin.id,
+      forwardNote: parsed.data.note,
+      platformStatus: "OPEN",
+      platformClosedAt: null,
+    },
+  });
+
+  try {
+    await notifyPlatformOfForwardedTicket({
+      clubName: ticket.club.name,
+      adminName: admin.name,
+      memberName: ticket.user.name,
+      memberEmail: ticket.user.email,
+      subject: ticket.subject,
+      message: ticket.message,
+      note: parsed.data.note,
+    });
+  } catch (error) {
+    console.error("Ticket-Weiterleitung", error);
+  }
+
+  revalidatePath("/admin/tickets");
+  revalidatePath("/vereine/tickets");
   return { ok: true };
 }
 

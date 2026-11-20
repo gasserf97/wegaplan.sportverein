@@ -110,6 +110,7 @@ model User {
   sectionCreditAccounts SectionCreditAccount[]
   supportTickets        SupportTicket[]    @relation("TicketCreator")
   closedSupportTickets  SupportTicket[]    @relation("TicketClosedBy")
+  forwardedSupportTickets SupportTicket[]  @relation("TicketForwardedBy")
   pendingRefundTransfers PendingRefundTransfer[] @relation("RefundRecipient")
   confirmedRefundTransfers PendingRefundTransfer[] @relation("RefundConfirmer")
   accountingExclusions  AccountingExclusion[]  @relation("AccountingExclusions")
@@ -596,6 +597,15 @@ model SupportTicket {
   closedAt   DateTime?
   closedById String?
   closedBy   User?                @relation("TicketClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  /// Zeitpunkt, zu dem der Verein das Ticket an wegaPlan weitergeleitet hat.
+  forwardedAt      DateTime?
+  forwardedById    String?
+  forwardedBy      User?                @relation("TicketForwardedBy", fields: [forwardedById], references: [id], onDelete: SetNull)
+  forwardNote      String               @default("")
+  /// Bearbeitung beim Betreiber, unabhängig vom Status im Verein.
+  platformStatus   SupportTicketStatus  @default(OPEN)
+  platformClosedAt DateTime?
+  platformReplies  SupportTicketPlatformReply[]
   createdAt  DateTime             @default(now())
 
   @@index([clubId])
@@ -603,6 +613,21 @@ model SupportTicket {
   @@index([userId])
   @@index([status])
   @@index([closedById])
+  @@index([forwardedAt])
+  @@index([forwardedById])
+  @@index([platformStatus])
+}
+
+/// Antwort von wegaPlan an den Verein. Das Mitglied sieht sie nicht.
+model SupportTicketPlatformReply {
+  id         String        @id @default(cuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  body       String
+  authorName String
+  createdAt  DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
 }
 
 /** Merker: für diesen Kalendertag wurde bereits eine Ticket-Mail versendet. */
