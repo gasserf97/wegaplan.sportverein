@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
   addFamilyMemberAction,
   updateFamilyMemberAction,
@@ -117,35 +117,37 @@ export function AddFamilyMemberForm({
             required
           />
         </div>
-        <div className="grid gap-2">
-          <Label htmlFor="phone" required={!noPlatformAccess}>
-            Mobiltelefon
-          </Label>
-          <Input
-            id="phone"
-            name="phone"
-            type="tel"
-            defaultValue={draft?.phone}
-            required={!noPlatformAccess}
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="email" required={!noPlatformAccess}>
-            E-Mail
-          </Label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            defaultValue={draft?.email}
-            required={!noPlatformAccess}
-          />
-          <p className="text-xs text-muted-foreground">
-            {noPlatformAccess
-              ? "Optional – ohne E-Mail gehen Bestätigungen an Ihr Familienkonto."
-              : "Pflicht für den Zugang. Die Person erhält eine Einladungs-E-Mail."}
-          </p>
-        </div>
+        {noPlatformAccess ? null : (
+          <>
+            <div className="grid gap-2">
+              <Label htmlFor="phone" required>
+                Mobiltelefon
+              </Label>
+              <Input
+                id="phone"
+                name="phone"
+                type="tel"
+                defaultValue={draft?.phone}
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="email" required>
+                E-Mail
+              </Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                defaultValue={draft?.email}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Pflicht für den Zugang. Die Person erhält eine Einladungs-E-Mail.
+              </p>
+            </div>
+          </>
+        )}
         <div className="sm:col-span-2">
           <TaxIdField
             id="taxId"
@@ -249,6 +251,7 @@ export function EditFamilyMemberForm({
   birthDate,
   isSelf = false,
   canLogin = true,
+  profileComplete = false,
   onSaved,
 }: {
   memberId: string;
@@ -262,7 +265,9 @@ export function EditFamilyMemberForm({
   birthDate: string;
   isSelf?: boolean;
   canLogin?: boolean;
-  onSaved?: (result?: { inviteSent?: boolean }) => void;
+  /** Stammdaten sind schon gespeichert. Dann darf das Passwort erscheinen. */
+  profileComplete?: boolean;
+  onSaved?: (result?: { inviteSent?: boolean; keepOpen?: boolean }) => void;
 }) {
   const bound = updateFamilyMemberAction.bind(null, memberId);
   const [state, formAction, pending] = useActionState<FamilyFormState, FormData>(
@@ -270,9 +275,24 @@ export function EditFamilyMemberForm({
     null,
   );
 
+  const [passwordVisible, setPasswordVisible] = useState(profileComplete);
+  const afterSaveRef = useRef<HTMLInputElement>(null);
+  const passwordWasHidden = useRef(!profileComplete);
+  const handledSave = useRef<FamilyFormState>(null);
+  const showPassword = isSelf && canLogin && passwordVisible;
+
   useEffect(() => {
-    if (state && "ok" in state) onSaved?.({ inviteSent: state.inviteSent });
-  }, [state, onSaved]);
+    if (!(state && "ok" in state)) return;
+    if (handledSave.current === state) return;
+    handledSave.current = state;
+    const revealPassword = isSelf && canLogin && passwordWasHidden.current;
+    if (isSelf && canLogin) setPasswordVisible(true);
+    passwordWasHidden.current = false;
+    onSaved?.({
+      inviteSent: state.inviteSent,
+      keepOpen: revealPassword,
+    });
+  }, [state, onSaved, isSelf, canLogin]);
 
   const draft = state && "error" in state ? state.fields : undefined;
   const [noPlatformAccess, setNoPlatformAccess] = useState(
@@ -355,37 +375,39 @@ export function EditFamilyMemberForm({
           required
         />
       </div>
-      <div className="grid gap-2">
-        <Label htmlFor={`phone-${memberId}`} required={isSelf || !noPlatformAccess}>
-          Mobiltelefon
-        </Label>
-        <Input
-          id={`phone-${memberId}`}
-          name="phone"
-          type="tel"
-          defaultValue={values.phone}
-          required={isSelf || !noPlatformAccess}
-        />
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor={`email-${memberId}`} required={isSelf || !noPlatformAccess}>
-          E-Mail
-        </Label>
-        <Input
-          id={`email-${memberId}`}
-          name="email"
-          type="email"
-          defaultValue={values.email}
-          required={isSelf || !noPlatformAccess}
-        />
-        {!isSelf ? (
-          <p className="text-xs text-muted-foreground">
-            {noPlatformAccess
-              ? "Optional. Ohne eigene E-Mail gehen Bestätigungen und Mitgliedskarte an das Familienkonto."
-              : "Pflicht für den Zugang. Die Person erhält eine Einladungs-E-Mail."}
-          </p>
-        ) : null}
-      </div>
+      {isSelf || !noPlatformAccess ? (
+        <>
+          <div className="grid gap-2">
+            <Label htmlFor={`phone-${memberId}`} required>
+              Mobiltelefon
+            </Label>
+            <Input
+              id={`phone-${memberId}`}
+              name="phone"
+              type="tel"
+              defaultValue={values.phone}
+              required
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor={`email-${memberId}`} required>
+              E-Mail
+            </Label>
+            <Input
+              id={`email-${memberId}`}
+              name="email"
+              type="email"
+              defaultValue={values.email}
+              required
+            />
+            {!isSelf ? (
+              <p className="text-xs text-muted-foreground">
+                Pflicht für den Zugang. Die Person erhält eine Einladungs-E-Mail.
+              </p>
+            ) : null}
+          </div>
+        </>
+      ) : null}
       <div className="sm:col-span-2">
         <TaxIdField
           id={`tax-${memberId}`}
@@ -426,7 +448,7 @@ export function EditFamilyMemberForm({
           required
         />
       </div>
-      {isSelf && canLogin ? (
+      {showPassword ? (
         <>
           <div className="grid gap-2">
             <Label htmlFor={`password-${memberId}`}>Neues Passwort</Label>
@@ -456,9 +478,40 @@ export function EditFamilyMemberForm({
         </>
       ) : null}
       <div className="grid gap-2 sm:col-span-2">
-        <Button type="submit" className="w-full" disabled={pending}>
-          {pending ? "…" : "Speichern"}
-        </Button>
+        <input ref={afterSaveRef} type="hidden" name="afterSave" defaultValue="family" />
+        {isSelf ? (
+          <>
+            <Button
+              type="submit"
+              className="h-auto w-full whitespace-normal py-2"
+              disabled={pending}
+              onClick={() => {
+                if (afterSaveRef.current) afterSaveRef.current.value = "family";
+              }}
+            >
+              {pending
+                ? "Speichern…"
+                : "Speichern und weiter Familienmitglieder hinzufügen"}
+            </Button>
+            <Button
+              type="submit"
+              variant="outline"
+              className="h-auto w-full whitespace-normal py-2"
+              disabled={pending}
+              onClick={() => {
+                if (afterSaveRef.current) afterSaveRef.current.value = "leave";
+              }}
+            >
+              {pending
+                ? "Speichern…"
+                : "Speichern ohne weitere Familienmitglieder"}
+            </Button>
+          </>
+        ) : (
+          <Button type="submit" className="w-full" disabled={pending}>
+            {pending ? "…" : "Speichern"}
+          </Button>
+        )}
         {state && "error" in state ? (
           <p className="text-sm text-destructive">{state.error}</p>
         ) : null}

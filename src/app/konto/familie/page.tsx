@@ -105,6 +105,7 @@ export default async function FamilyPage({
               hasMembership={self.hasMembership}
               isSelf
               canManage
+              profileComplete={selfComplete}
               defaultOpen={!selfComplete}
             />
           </div>
