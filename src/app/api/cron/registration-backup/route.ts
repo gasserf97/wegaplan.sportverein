@@ -19,7 +19,12 @@ export async function GET(request: Request) {
     const result = await runWithClub(club.id, () => sendRegistrationBackupEmail());
     results.push({ slug: club.slug, ...result });
   }
-  const failed = results.filter((item) => !item.ok);
+  // Ein Verein ohne eigene Mail ist kein Ausfall des Cron-Jobs.
+  const failed = results.filter(
+    (item) =>
+      !item.ok &&
+      (!("reason" in item) || item.reason !== "not_configured"),
+  );
   return Response.json(
     { ok: failed.length === 0, results },
     { status: failed.length === 0 ? 200 : 500 },

@@ -49,6 +49,24 @@ function clubMailConfigured(settings: {
   return false;
 }
 
+/**
+ * Absender ohne @ (nur Vereinsname) plus Backup-Empfänger wird zu
+ * „Name <empfaenger@verein.de>“. Sonst bliebe MAIL_FROM ungültig und der
+ * Backup-Cron bricht ab.
+ */
+export function clubMailFromAddress(mailFrom: string, backupEmail: string) {
+  const from = mailFrom.trim();
+  if (from.includes("@")) return from;
+  const backup =
+    backupEmail
+      .split(/[,;]+/)
+      .map((item) => item.trim())
+      .find((item) => item.includes("@")) ?? "";
+  if (!backup) return from;
+  if (from) return `${from} <${backup}>`;
+  return backup;
+}
+
 /** null = Prozess-Umgebung nutzen (Legacy, kein Verein, oder Mail noch nicht am Verein). */
 export async function mailEnvOverlay(): Promise<MailEnvOverlay | null> {
   const club = await getCurrentClubRecord();
@@ -56,9 +74,15 @@ export async function mailEnvOverlay(): Promise<MailEnvOverlay | null> {
   if (usesLegacyEnv(club)) return null;
   const settings = club.settings;
   if (!clubMailConfigured(settings)) return null;
+  const mailFrom = clubMailFromAddress(
+    settings?.mailFrom ?? "",
+    settings?.registrationBackupEmail ?? "",
+  );
+  // Unvollständiger Absender darf die Plattform-Mail nicht verdecken.
+  if (!mailFrom.includes("@")) return null;
   return {
     MAIL_PROVIDER: settings?.mailProvider ?? "",
-    MAIL_FROM: settings?.mailFrom ?? "",
+    MAIL_FROM: mailFrom,
     BREVO_API_KEY: decryptSecret(settings?.brevoApiKey ?? ""),
     RESEND_API_KEY: decryptSecret(settings?.resendApiKey ?? ""),
     SMTP_HOST: settings?.smtpHost ?? "",

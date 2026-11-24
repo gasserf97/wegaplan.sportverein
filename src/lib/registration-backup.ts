@@ -330,6 +330,7 @@ export async function sendRegistrationBackupEmail(options?: { to?: string | null
   if (!(await isMailConfigured())) {
     return {
       ok: false as const,
+      reason: "not_configured" as const,
       message: "E-Mail-Versand ist nicht konfiguriert.",
     };
   }
