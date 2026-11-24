@@ -316,17 +316,23 @@ async function sendViaBrevo(options: OutgoingMail): Promise<MailDeliveryResult> 
         ? { name: sender.name, email: sender.email }
         : { email: sender.email },
       replyTo: { email: sender.email, name: sender.name ?? "ASC Lajen" },
-      to: [{ email: options.to }],
+      to: [
+        {
+          email: options.to,
+          // Öffnungsbild sendibt3.com/tr/op/ abschalten. Brevo wertet das
+          // nur im Enterprise-Tarif aus, sonst bleibt das Bild drin.
+          removeTrackingPixel: true,
+          contactPixelTrackingConsent: false,
+        },
+      ],
       subject: options.subject,
       htmlContent: options.html,
       textContent: options.text,
-      // Brevo ersetzt sonst jeden Link durch sendibt3.com/tr/cl/… und setzt
-      // ein Zählpixel sendibt3.com/tr/op/…. In Mail-Apps ist das der einzige
-      // sichtbare Link und öffnet nicht die App.
+      // Klick-Tracking (sendibt3.com/tr/cl/) zusätzlich per Header aus.
       headers: {
-        "X-Mailin-Track": "false",
-        "X-Mailin-Track-Clicks": "false",
-        "X-Mailin-Track-Opens": "false",
+        "X-Mailin-Track": "0",
+        "X-Mailin-Track-Clicks": "0",
+        "X-Mailin-Track-Opens": "0",
       },
       ...(attachment ? { attachment } : {}),
     }),
