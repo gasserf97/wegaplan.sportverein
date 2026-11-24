@@ -1,5 +1,6 @@
+import { createHash, randomBytes } from "node:crypto";
 import type { User } from "@/generated/prisma/client";
-import { SignJWT, jwtVerify, errors as JoseErrors } from "jose";
+import { jwtVerify, errors as JoseErrors } from "jose";
 import { prisma } from "@/lib/prisma";
 import {
   sendAccountInviteEmail,
@@ -40,14 +41,22 @@ export type VerifyTokenLookup =
   | { status: "missing" }
   | { status: "expired" };
 
-/** Signierter Link-Token (kein DB-Lookup nötig – behebt „Link ungültig“). */
-async function createVerifyJwt(userId: string) {
-  return new SignJWT({ purpose: PURPOSE })
-    .setProtectedHeader({ alg: "HS256" })
-    .setSubject(userId)
-    .setIssuedAt()
-    .setExpirationTime(`${VERIFY_HOURS}h`)
-    .sign(getAuthSecret());
+/**
+ * Kurzer Hex-Token ohne Punkte. JWTs in der URL werden von Mail-Programmen
+ * oft an den Punkten abgeschnitten, der Link ist dann „ungültig“.
+ */
+function createVerifyToken() {
+  // 16 Bytes: die komplette URL bleibt unter 76 Zeichen, damit sie in
+  // Text-Mails nicht umbrochen und dadurch abgeschnitten wird.
+  return randomBytes(16).toString("hex");
+}
+
+function hashVerifyToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function isLegacyJwt(token: string) {
+  return token.split(".").length === 3;
 }
 
 export async function findUserByVerifyToken(token: string) {
@@ -60,6 +69,20 @@ export async function lookupVerifyToken(
 ): Promise<VerifyTokenLookup> {
   const token = normalizeVerifyToken(rawToken);
   if (!token) return { status: "missing" };
+
+  if (!isLegacyJwt(token)) {
+    const user = await prisma.user.findUnique({
+      where: { emailVerifyToken: hashVerifyToken(token) },
+    });
+    if (!user || !user.canLogin) return { status: "missing" };
+    if (
+      !user.emailVerifyExpiresAt ||
+      user.emailVerifyExpiresAt.getTime() <= Date.now()
+    ) {
+      return { status: "expired" };
+    }
+    return { status: "ok", user };
+  }
 
   try {
     const { payload } = await jwtVerify(token, getAuthSecret());
@@ -95,12 +118,11 @@ async function issueLink(
   nextPath: string | undefined,
   send: (confirmUrl: string) => Promise<{ sent: boolean; message?: string }>,
 ): Promise<EmailVerificationResult> {
-  const token = await createVerifyJwt(userId);
-  // Merker für UI/Admin: offener Bestätigungslink (kein Lookup mehr darüber).
+  const token = createVerifyToken();
   await prisma.user.update({
     where: { id: userId },
     data: {
-      emailVerifyToken: `jwt:${userId}`,
+      emailVerifyToken: hashVerifyToken(token),
       emailVerifyExpiresAt: new Date(Date.now() + VERIFY_HOURS * 60 * 60 * 1000),
     },
   });
