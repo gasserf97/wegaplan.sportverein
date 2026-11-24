@@ -351,6 +351,13 @@ async function sendViaBrevo(options: OutgoingMail): Promise<MailDeliveryResult> 
       subject: options.subject,
       htmlContent: options.html,
       textContent: options.text,
+      // Klick- und Öffnungs-Tracking hängt sendibt3.com an die Mail.
+      // Postfächer legen solche Registrierungsmails in den Spam.
+      headers: {
+        "X-Mailin-Track": "false",
+        "X-Mailin-Track-Clicks": "false",
+        "X-Mailin-Track-Opens": "false",
+      },
       ...(attachment ? { attachment } : {}),
     }),
   });
@@ -536,12 +543,21 @@ async function deliverMail(options: {
   return sendViaSmtp({ from: fromResult.from, ...options });
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/"/g, "&quot;");
+}
+
 export async function sendVerificationEmail(to: string, confirmUrl: string) {
   const club = await clubMailName();
+  const safeClub = escapeHtml(club);
   const subject = `Bitte bestätigen Sie Ihre E-Mail – ${club}`;
-  const text = `Guten Tag,\n\nbitte bestätigen Sie Ihre E-Mail-Adresse für ${club} und legen Sie danach Ihr Passwort fest:\n${confirmUrl}\n\nDer Link gilt 48 Stunden.\n\n${club}`;
-  const href = confirmUrl.replace(/&/g, "&amp;");
-  const html = `<p>Guten Tag,</p><p>bitte bestätigen Sie Ihre E-Mail-Adresse für ${club} und legen Sie danach Ihr Passwort fest:</p><p><a href="${href}">E-Mail bestätigen und Passwort setzen</a></p><p>Der Link gilt 48 Stunden.</p><p>${club}</p>`;
+  const text = `Guten Tag,\n\nbitte bestätigen Sie Ihre E-Mail-Adresse für ${club} und legen Sie danach Ihr Passwort fest. Kopieren Sie diese Adresse in den Browser:\n${confirmUrl}\n\nDer Link gilt 48 Stunden.\n\n${club}`;
+  const href = escapeHtml(confirmUrl);
+  // Kein <a href>: Brevo ersetzt den Link sonst durch sendibt3.com, die Mail landet im Spam.
+  const html = `<p>Guten Tag,</p><p>bitte bestätigen Sie Ihre E-Mail-Adresse für ${safeClub} und legen Sie danach Ihr Passwort fest. Kopieren Sie diese Adresse in den Browser:</p><p>${href}</p><p>Der Link gilt 48 Stunden.</p><p>${safeClub}</p>`;
   return sendMail({ to, subject, text, html });
 }
 
@@ -553,18 +569,18 @@ export async function sendAccountInviteEmail(
   const club = await clubMailName();
   const subject = `Ihr Familienkonto bei ${club}`;
   const safeName = name.trim() || "Mitglied";
-  const text = `Guten Tag ${safeName},\n\nfür Sie wurde ein Zugang zum Familienkonto bei ${club} angelegt.\nBitte öffnen Sie den Link und legen Sie Ihr Passwort fest:\n${confirmUrl}\n\nDer Link gilt 48 Stunden.\n\n${club}`;
-  const href = confirmUrl.replace(/&/g, "&amp;");
-  const html = `<p>Guten Tag ${safeName.replace(/</g, "&lt;")},</p><p>für Sie wurde ein Zugang zum Familienkonto bei ${club} angelegt.</p><p>Bitte öffnen Sie den Link und legen Sie Ihr Passwort fest:</p><p><a href="${href}">Passwort festlegen und anmelden</a></p><p>Der Link gilt 48 Stunden.</p><p>${club}</p>`;
+  const text = `Guten Tag ${safeName},\n\nfür Sie wurde ein Zugang zum Familienkonto bei ${club} angelegt.\nBitte kopieren Sie diese Adresse in den Browser und legen Sie Ihr Passwort fest:\n${confirmUrl}\n\nDer Link gilt 48 Stunden.\n\n${club}`;
+  const href = escapeHtml(confirmUrl);
+  const html = `<p>Guten Tag ${escapeHtml(safeName)},</p><p>für Sie wurde ein Zugang zum Familienkonto bei ${escapeHtml(club)} angelegt.</p><p>Bitte kopieren Sie diese Adresse in den Browser und legen Sie Ihr Passwort fest:</p><p>${href}</p><p>Der Link gilt 48 Stunden.</p><p>${escapeHtml(club)}</p>`;
   return sendMail({ to, subject, text, html });
 }
 
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   const club = await clubMailName();
   const subject = `Passwort zurücksetzen – ${club}`;
-  const text = `Guten Tag,\n\nSie haben ein neues Passwort für ${club} angefordert. Öffnen Sie den Link und legen Sie ein neues Passwort fest:\n${resetUrl}\n\nDer Link gilt ${PASSWORD_RESET_HOURS} Stunden. Wenn Sie das nicht waren, können Sie diese E-Mail ignorieren.\n\n${club}`;
-  const href = resetUrl.replace(/&/g, "&amp;");
-  const html = `<p>Guten Tag,</p><p>Sie haben ein neues Passwort für ${club} angefordert. Öffnen Sie den Link und legen Sie ein neues Passwort fest:</p><p><a href="${href}">Neues Passwort festlegen</a></p><p>Der Link gilt ${PASSWORD_RESET_HOURS} Stunden. Wenn Sie das nicht waren, können Sie diese E-Mail ignorieren.</p><p>${club}</p>`;
+  const text = `Guten Tag,\n\nSie haben ein neues Passwort für ${club} angefordert. Kopieren Sie diese Adresse in den Browser und legen Sie ein neues Passwort fest:\n${resetUrl}\n\nDer Link gilt ${PASSWORD_RESET_HOURS} Stunden. Wenn Sie das nicht waren, können Sie diese E-Mail ignorieren.\n\n${club}`;
+  const href = escapeHtml(resetUrl);
+  const html = `<p>Guten Tag,</p><p>Sie haben ein neues Passwort für ${escapeHtml(club)} angefordert. Kopieren Sie diese Adresse in den Browser und legen Sie ein neues Passwort fest:</p><p>${href}</p><p>Der Link gilt ${PASSWORD_RESET_HOURS} Stunden. Wenn Sie das nicht waren, können Sie diese E-Mail ignorieren.</p><p>${escapeHtml(club)}</p>`;
   return sendMail({ to, subject, text, html });
 }
 
