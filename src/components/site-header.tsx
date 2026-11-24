@@ -114,12 +114,14 @@ export function SiteHeader({
   showFleet = false,
   homeHref = "/",
   lockNavigation = false,
+  clubLogoUrl = null,
 }: {
   user: SessionUser | null;
   showAdmin?: boolean;
   showFleet?: boolean;
   homeHref?: string;
   lockNavigation?: boolean;
+  clubLogoUrl?: string | null;
 }) {
   const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -134,7 +136,7 @@ export function SiteHeader({
           className="flex shrink-0 items-center gap-2 sm:gap-3"
           aria-label="ASC Lajen Raiffeisen"
         >
-          <ClubLogo variant="icon" href={null} priority />
+          <ClubLogo variant="icon" href={null} priority src={clubLogoUrl} />
           <ClubLogo
             variant="wordmark"
             href={null}

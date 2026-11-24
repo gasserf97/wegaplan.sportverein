@@ -10,6 +10,8 @@ type ClubLogoProps = {
   priority?: boolean;
   /** Accessible label; defaults to club name. */
   alt?: string;
+  /** Hinterlegtes Vereinslogo. Ersetzt nur das Zeichen, nicht den Schriftzug. */
+  src?: string | null;
 };
 
 const SIZE = {
@@ -24,13 +26,15 @@ export function ClubLogo({
   className,
   priority = false,
   alt = ASC_CLUB.name,
+  src: srcOverride = null,
 }: ClubLogoProps) {
   const src =
-    variant === "icon"
+    srcOverride ||
+    (variant === "icon"
       ? ASC_LOGOS.icon
       : variant === "mark"
         ? ASC_LOGOS.mark
-        : ASC_LOGOS.wordmark;
+        : ASC_LOGOS.wordmark);
   const size = SIZE[variant];
   const image = (
     <Image
@@ -39,6 +43,7 @@ export function ClubLogo({
       width={size.width}
       height={size.height}
       priority={priority}
+      unoptimized={Boolean(srcOverride)}
       className={cn("object-contain", size.className, className)}
     />
   );
