@@ -22,6 +22,7 @@ type FamilyMemberCardProps = {
   isSelf: boolean;
   canManage: boolean;
   canLogin?: boolean;
+  profileComplete?: boolean;
   defaultOpen?: boolean;
   className?: string;
 };
@@ -43,6 +44,7 @@ export function FamilyMemberCard({
   isSelf,
   canManage,
   canLogin = true,
+  profileComplete = false,
   defaultOpen = false,
   className = "",
 }: FamilyMemberCardProps) {
@@ -51,13 +53,13 @@ export function FamilyMemberCard({
   const [savedNote, setSavedNote] = useState("Daten gespeichert.");
   const cardRef = useRef<HTMLDivElement>(null);
   const panelId = `family-member-${memberId}`;
-  const handleSaved = useCallback((result?: { inviteSent?: boolean }) => {
+  const handleSaved = useCallback((result?: { inviteSent?: boolean; keepOpen?: boolean }) => {
     setSavedNote(
       result?.inviteSent
         ? "Daten gespeichert. Die Einladungs-E-Mail wurde gesendet."
         : "Daten gespeichert.",
     );
-    setOpen(false);
+    if (!result?.keepOpen) setOpen(false);
     setSaved(true);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -139,6 +141,7 @@ export function FamilyMemberCard({
                 birthDate={birthDate}
                 isSelf={isSelf}
                 canLogin={canLogin}
+                profileComplete={profileComplete}
                 onSaved={handleSaved}
               />
               {!isSelf && canManage ? (

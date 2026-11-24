@@ -24,6 +24,7 @@ import {
   PROFILE_INCOMPLETE_NAME,
   splitPersonName,
 } from "@/lib/profile";
+import { shouldShowMembershipNotices } from "@/lib/membership-notices";
 import { findProfileConflict } from "@/lib/profile-db";
 import {
   allocateUniqueUsername,
@@ -121,6 +122,11 @@ function familyDraftFromForm(formData: FormData): FamilyDraftFields {
 
 function familyError(error: string, formData: FormData): FamilyFormState {
   return { error, fields: familyDraftFromForm(formData) };
+}
+
+/** Bis 31.12.2026 Kurse, ab 01.01.2027 die Mitgliedschaften. */
+function pathAfterFamilySetup() {
+  return shouldShowMembershipNotices() ? "/abos" : "/kurse";
 }
 
 function revalidateFamily() {
@@ -472,6 +478,9 @@ export async function updateFamilyMemberAction(
   }
 
   revalidateFamily();
+  if (isSelf && String(formData.get("afterSave") ?? "") === "leave") {
+    redirect(pathAfterFamilySetup());
+  }
   return { ok: true, inviteSent: false };
 }
 
