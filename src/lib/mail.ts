@@ -527,9 +527,9 @@ export async function sendAccountInviteEmail(
 
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   const subject = "Passwort zurücksetzen – ASC Lajen";
-  const text = `Guten Tag,\n\nSie haben ein neues Passwort für den ASC Lajen angefordert. Öffnen Sie den Link und legen Sie ein neues Passwort fest:\n${resetUrl}\n\nDer Link gilt ${PASSWORD_RESET_HOURS} Stunden. Wenn Sie das nicht waren, können Sie diese E-Mail ignorieren.\n\nASC Lajen Raiffeisen`;
-  const href = resetUrl.replace(/&/g, "&amp;");
-  const html = `<p>Guten Tag,</p><p>Sie haben ein neues Passwort für den ASC Lajen angefordert. Öffnen Sie den Link und legen Sie ein neues Passwort fest:</p><p><a href="${href}">Neues Passwort festlegen</a></p><p>Der Link gilt ${PASSWORD_RESET_HOURS} Stunden. Wenn Sie das nicht waren, können Sie diese E-Mail ignorieren.</p><p>ASC Lajen Raiffeisen</p>`;
+  const text = `Guten Tag,\n\nSie haben ein neues Passwort für den ASC Lajen angefordert. Kopieren Sie diese Adresse in den Browser und legen Sie ein neues Passwort fest:\n${resetUrl}\n\nDer Link gilt ${PASSWORD_RESET_HOURS} Stunden. Wenn Sie das nicht waren, können Sie diese E-Mail ignorieren.\n\nASC Lajen Raiffeisen`;
+  const href = escapeHtml(resetUrl);
+  const html = `<p>Guten Tag,</p><p>Sie haben ein neues Passwort für den ASC Lajen angefordert. Kopieren Sie diese Adresse in den Browser und legen Sie ein neues Passwort fest:</p><p>${href}</p><p>Der Link gilt ${PASSWORD_RESET_HOURS} Stunden. Wenn Sie das nicht waren, können Sie diese E-Mail ignorieren.</p><p>ASC Lajen Raiffeisen</p>`;
   return sendMail({ to, subject, text, html });
 }
 
