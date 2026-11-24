@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { MemberImportForm } from "@/components/member-import-form";
 import {
   StaffManagement,
   type StaffMember,
@@ -129,6 +130,8 @@ export default async function MembersAdminPage() {
           ) : null}
         </div>
       </div>
+
+      {canEdit ? <MemberImportForm /> : null}
 
       {members.length === 0 ? (
         <p className="mt-8 rounded-2xl bg-card p-8 text-muted-foreground ring-1 ring-foreground/10">
