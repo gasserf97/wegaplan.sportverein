@@ -266,6 +266,7 @@ export function StaffManagement({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filterClub, setFilterClub] = useState(false);
+  const [filterNonMembers, setFilterNonMembers] = useState(false);
   const [filterTennis, setFilterTennis] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -289,6 +290,7 @@ export function StaffManagement({
     const filtered = members.filter((member) => {
       if (!memberMatchesQuery(member, query)) return false;
       if (filterClub && !member.hasClubMembership) return false;
+      if (filterNonMembers && member.hasClubMembership) return false;
       if (filterTennis && !member.hasTennisMembership) return false;
       return true;
     });
@@ -297,7 +299,7 @@ export function StaffManagement({
       return sortDir === "asc" ? result : -result;
     });
     return sorted;
-  }, [members, query, filterClub, filterTennis, sortKey, sortDir, sections]);
+  }, [members, query, filterClub, filterNonMembers, filterTennis, sortKey, sortDir, sections]);
 
   return (
     <div className="mt-6 space-y-4">
@@ -318,10 +320,27 @@ export function StaffManagement({
             <input
               type="checkbox"
               checked={filterClub}
-              onChange={(event) => setFilterClub(event.target.checked)}
+              onChange={(event) => {
+                const checked = event.target.checked;
+                setFilterClub(checked);
+                if (checked) setFilterNonMembers(false);
+              }}
               className="size-4 accent-primary"
             />
             Sportvereinsmitglied
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={filterNonMembers}
+              onChange={(event) => {
+                const checked = event.target.checked;
+                setFilterNonMembers(checked);
+                if (checked) setFilterClub(false);
+              }}
+              className="size-4 accent-primary"
+            />
+            Nicht Mitglieder
           </label>
           <label className="flex items-center gap-2">
             <input
