@@ -120,8 +120,8 @@ export async function cancelEnrollmentAction(
         const storedFee =
           enrollment.stripeFeeCents ??
           (await fetchStripeFeeFromCheckoutSession(enrollment.stripeSessionId));
-        const { feeCents } = resolveStripeFeeCents(externalCents, storedFee);
-        const payout = cashRefundPayoutCents({
+        const { feeCents } = await resolveStripeFeeCents(externalCents, storedFee);
+        const payout = await cashRefundPayoutCents({
           paymentMethod: "STRIPE",
           externalCents,
           stripeFeeCents: feeCents,
@@ -142,11 +142,11 @@ export async function cancelEnrollmentAction(
         }
       } catch (error) {
         console.error("Kurs-Kartenerstattung", enrollment.id, error);
-        const { feeCents } = resolveStripeFeeCents(
+        const { feeCents } = await resolveStripeFeeCents(
           externalCents,
           enrollment.stripeFeeCents,
         );
-        const payout = cashRefundPayoutCents({
+        const payout = await cashRefundPayoutCents({
           paymentMethod: "STRIPE",
           externalCents,
           stripeFeeCents: feeCents,

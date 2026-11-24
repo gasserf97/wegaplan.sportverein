@@ -28,11 +28,12 @@ export const de = {
     adminSubscriptions: "Mitgliedschaften",
     adminAccounting: "Buchhaltung",
     adminMembers: "Mitglieder",
+    adminClub: "Verein",
     adminSections: "Sektionen",
     adminCourts: "Tennisplätze",
     adminFleet: "Fuhrpark",
     adminTickets: "Tickets",
-    adminHosting: "Hosting",
+    adminHosting: "Besucher",
     adminEvents: "Events",
   },
 
@@ -885,7 +886,10 @@ export const de = {
     accessDeniedLink: "Zur Startseite",
     hostingTitle: "Hosting & Auslastung",
     hostingDesc:
-      "Überwacht App und Postgres. Ab ca. 70 % Auslastung erscheint eine Warnung, ab ca. 85 % eine dringende Empfehlung zum Upgrade bei Render.",
+      "Server, Datenbank und Render dieser Installation. Ab ca. 70 % Auslastung erscheint eine Warnung, ab ca. 85 % eine dringende Empfehlung zum Upgrade.",
+    hostingUsageTitle: "Besucher",
+    hostingUsageDesc:
+      "Personen, die heute angemeldet waren, und wie viele gerade gleichzeitig in der App sind.",
     hostingCheckedAt: "Zuletzt geprüft: {time}",
     hostingOverall: "Gesamtstatus",
     hostingAllOk: "Alles im grünen Bereich – kein Upgrade nötig.",
@@ -1057,6 +1061,20 @@ export const de = {
     ticketReplyBody: "Nachricht",
     ticketReplySend: "Per E-Mail senden",
     ticketReplySent: "Antwort wurde per E-Mail gesendet.",
+    ticketForward: "An wegaPlan weiterleiten",
+    ticketForwardAgain: "Erneut an wegaPlan",
+    ticketForwardTitle: "An wegaPlan weiterleiten",
+    ticketForwardHint:
+      "Das Ticket erscheint beim Betreiber. Das Mitglied wird nicht benachrichtigt.",
+    ticketForwardAgainHint:
+      "Das Ticket liegt bereits bei wegaPlan. Ein erneutes Senden setzt es dort wieder auf offen.",
+    ticketForwardNote: "Hinweis für wegaPlan (optional)",
+    ticketForwardSend: "Weiterleiten",
+    ticketForwardSent: "An wegaPlan weitergeleitet.",
+    ticketForwarded: "An wegaPlan weitergeleitet",
+    ticketForwardDone: "wegaPlan hat es erledigt",
+    ticketPlatformReply: "Antwort von wegaPlan",
+    ticketPlatformReplyBy: "von {name}",
   },
 
   pwa: {

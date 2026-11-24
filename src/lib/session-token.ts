@@ -43,7 +43,7 @@ type SessionIdentity = {
 
 export async function createSessionToken(
   user: SessionIdentity,
-  options?: { impersonatorId?: string },
+  options?: { impersonatorId?: string; platformImpersonatorId?: string },
 ) {
   return new SignJWT({
     sub: user.id,
@@ -52,6 +52,9 @@ export async function createSessionToken(
     email: user.email,
     role: user.role,
     ...(options?.impersonatorId ? { imp: options.impersonatorId } : {}),
+    ...(options?.platformImpersonatorId
+      ? { pimp: options.platformImpersonatorId }
+      : {}),
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -74,6 +77,10 @@ export async function renewedSessionToken(token: string) {
       typeof payload.imp === "string" && payload.imp.length > 0
         ? payload.imp
         : undefined;
+    const platformImpersonatorId =
+      typeof payload.pimp === "string" && payload.pimp.length > 0
+        ? payload.pimp
+        : undefined;
 
     return createSessionToken(
       {
@@ -83,7 +90,10 @@ export async function renewedSessionToken(token: string) {
         email: typeof payload.email === "string" ? payload.email : "",
         role: payload.role === "ADMIN" ? "ADMIN" : "USER",
       },
-      impersonatorId ? { impersonatorId } : undefined,
+      {
+        ...(impersonatorId ? { impersonatorId } : {}),
+        ...(platformImpersonatorId ? { platformImpersonatorId } : {}),
+      },
     );
   } catch {
     return null;

@@ -7,6 +7,7 @@ import {
   type RGB,
 } from "pdf-lib";
 import { ASC_LAJEN } from "@/lib/brand";
+import { getClubBrand, type ClubBrand } from "@/lib/club-brand";
 import { formatBirthDate } from "@/lib/format";
 import { validityLabel, type MembershipCardData } from "@/lib/membership-card-data";
 import { winAnsi } from "@/lib/payment-confirmation-pdf";
@@ -34,13 +35,13 @@ function mixRgb(a: RGB, b: RGB, t: number): RGB {
   );
 }
 
-/** Wie in der App: linear-gradient(160deg, red 0%, navy 55%, green 100%). */
-function gradientColor(t: number): RGB {
-  const red = hexRgb(ASC_LAJEN.red);
-  const navy = hexRgb(ASC_LAJEN.navy);
-  const green = hexRgb(ASC_LAJEN.green);
-  if (t <= 0.55) return mixRgb(red, navy, t / 0.55);
-  return mixRgb(navy, green, (t - 0.55) / 0.45);
+/** Wie in der App: linear-gradient(160deg, Anfang 0%, Mitte 55%, Ende 100%). */
+function gradientColor(t: number, brand: ClubBrand): RGB {
+  const start = hexRgb(brand.colorCardStart);
+  const mid = hexRgb(brand.colorCardMid);
+  const end = hexRgb(brand.colorCardEnd);
+  if (t <= 0.55) return mixRgb(start, mid, t / 0.55);
+  return mixRgb(mid, end, (t - 0.55) / 0.45);
 }
 
 /** Gefülltes Round-Rect über Rechtecke + Kreise (SVG-Pfad füllt in pdf-lib oft nicht). */
@@ -121,10 +122,11 @@ async function drawCard(
   pdf: PDFDocument,
   data: MembershipCardData,
   fonts: { regular: PDFFont; bold: PDFFont },
+  brand: ClubBrand,
 ) {
   const white = rgb(1, 1, 1);
-  const navy = hexRgb(ASC_LAJEN.navy);
-  const green = hexRgb(ASC_LAJEN.green);
+  const navy = hexRgb(brand.colorCardMid);
+  const green = hexRgb(brand.colorCardEnd);
   const grey = rgb(0.4, 0.4, 0.4);
   const dark = hexRgb(ASC_LAJEN.dark);
 
@@ -136,7 +138,7 @@ async function drawCard(
       y,
       width: CARD_WIDTH,
       height: Math.min(strip, CARD_HEIGHT - y),
-      color: gradientColor(fromTop),
+      color: gradientColor(fromTop, brand),
     });
   }
 
@@ -150,21 +152,23 @@ async function drawCard(
   const logoBytes = await readPublicAsset("asc-logo-icon.png");
   if (logoBytes) {
     try {
-      const image = await pdf.embedPng(logoBytes);
-      const inset = (logoBox - logoInner) / 2;
-      page.drawImage(image, {
-        x: logoX + inset,
-        y: logoY + inset,
-        width: logoInner,
-        height: logoInner,
-      });
+      const image = await embedPngOrJpg(pdf, logoBytes);
+      if (image) {
+        const inset = (logoBox - logoInner) / 2;
+        page.drawImage(image, {
+          x: logoX + inset,
+          y: logoY + inset,
+          width: logoInner,
+          height: logoInner,
+        });
+      }
     } catch {
       // ohne Logo weiterzeichnen
     }
   }
 
   const headerMaxWidth = logoX - pad - 10;
-  page.drawText(winAnsi("ASC LAJEN RAIFFEISEN"), {
+  page.drawText(winAnsi(brand.name), {
     x: pad,
     y: CARD_HEIGHT - 32,
     size: 8,
@@ -245,17 +249,26 @@ async function drawCard(
   });
 }
 
+async function embedPngOrJpg(pdf: PDFDocument, bytes: Uint8Array) {
+  try {
+    return await pdf.embedPng(bytes);
+  } catch {
+    return pdf.embedJpg(bytes);
+  }
+}
+
 export async function buildMembershipCardPdf(data: MembershipCardData) {
+  const brand = await getClubBrand();
   const pdf = await PDFDocument.create();
   pdf.setTitle(`${data.cardTitle} – ${data.name}`);
-  pdf.setAuthor("ASC Lajen Raiffeisen");
-  pdf.setCreator("ASC Lajen Raiffeisen");
+  pdf.setAuthor(brand.name);
+  pdf.setCreator(brand.name);
   pdf.setLanguage("de-IT");
 
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const page = pdf.addPage([CARD_WIDTH, CARD_HEIGHT]);
-  await drawCard(page, pdf, data, { regular, bold });
+  await drawCard(page, pdf, data, { regular, bold }, brand);
 
   return Buffer.from(await pdf.save());
 }

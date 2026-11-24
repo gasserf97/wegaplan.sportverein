@@ -34,7 +34,7 @@ export function showcaseCheckoutPath(sessionId: string) {
 export async function startShowcaseCheckout(
   assign: (sessionId: string) => Promise<void>,
 ) {
-  if (!isStripeDemoMode()) return null;
+  if (!(await isStripeDemoMode())) return null;
   const sessionId = newShowcaseSessionId();
   await assign(sessionId);
   return { url: showcaseCheckoutPath(sessionId) };

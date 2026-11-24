@@ -1,0 +1,19 @@
+-- Erscheinungsbild pro Verein: Adresse, Farben, Stempel.
+ALTER TABLE "ClubSettings" ADD COLUMN "stampStorageKey" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ClubSettings" ADD COLUMN "stampMimeType" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ClubSettings" ADD COLUMN "letterName" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ClubSettings" ADD COLUMN "namePrimary" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ClubSettings" ADD COLUMN "nameSecondary" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ClubSettings" ADD COLUMN "president" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ClubSettings" ADD COLUMN "street" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ClubSettings" ADD COLUMN "postalCode" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ClubSettings" ADD COLUMN "city" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ClubSettings" ADD COLUMN "province" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ClubSettings" ADD COLUMN "taxId" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ClubSettings" ADD COLUMN "vatId" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ClubSettings" ADD COLUMN "legalForm" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ClubSettings" ADD COLUMN "tennisClubName" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ClubSettings" ADD COLUMN "colorPrimary" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ClubSettings" ADD COLUMN "colorCardStart" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ClubSettings" ADD COLUMN "colorCardMid" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "ClubSettings" ADD COLUMN "colorCardEnd" TEXT NOT NULL DEFAULT '';

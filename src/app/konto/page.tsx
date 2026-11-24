@@ -39,6 +39,7 @@ import {
   missingDocumentKinds,
 } from "@/lib/course-documents";
 import { getCurrentUser } from "@/lib/auth";
+import { getClubBrand } from "@/lib/club-brand";
 import { householdRootId, listFamily } from "@/lib/family";
 import {
   formatBirthDate,
@@ -83,6 +84,7 @@ function pendingPaymentLabel(t: TFunction) {
 
 export default async function AccountPage() {
   const { locale, t } = await getServerI18n();
+  const brand = await getClubBrand();
   const user = await getCurrentUser();
   if (!user) {
     redirect("/anmelden?next=/konto");
@@ -519,6 +521,13 @@ export default async function AccountPage() {
             {membershipCards.map((item) => (
               <li key={item.id}>
                 <MembershipCardView
+                  clubName={brand.name}
+                  logoUrl={brand.logoUrl}
+                  colors={{
+                    start: brand.colorCardStart,
+                    mid: brand.colorCardMid,
+                    end: brand.colorCardEnd,
+                  }}
                   data={toCardData({
                     userId: item.user.id,
                     name: item.user.name,

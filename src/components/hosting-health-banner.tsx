@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  getHostingHealth,
+  getPlatformHostingHealth,
   hostingNeedsAttention,
 } from "@/lib/hosting-health";
 import { getServerI18n } from "@/lib/i18n";
@@ -10,7 +10,7 @@ export async function HostingHealthBanner() {
   const { t } = await getServerI18n();
   let report;
   try {
-    report = await getHostingHealth();
+    report = await getPlatformHostingHealth();
   } catch {
     return null;
   }
@@ -20,7 +20,7 @@ export async function HostingHealthBanner() {
   return (
     <div
       className={cn(
-        "mb-6 rounded-xl border px-4 py-3 text-sm",
+        "mx-auto mt-6 w-[calc(100%-2rem)] max-w-6xl rounded-xl border px-4 py-3 text-sm",
         critical
           ? "border-red-300 bg-red-50 text-red-950"
           : "border-amber-300 bg-amber-50 text-amber-950",
@@ -34,7 +34,7 @@ export async function HostingHealthBanner() {
       <p className="mt-1">
         {report.recommendations[0] ?? t("admin.hostingBannerFallback")}
       </p>
-      <Link href="/admin/hosting" className="mt-2 inline-block font-medium underline">
+      <Link href="/vereine/hosting" className="mt-2 inline-block font-medium underline">
         {t("admin.hostingBannerLink")}
       </Link>
     </div>

@@ -34,6 +34,7 @@ export type SessionUser = {
 };
 
 export type ImpersonationContext = {
+  mode: "member" | "platform";
   adminId: string;
   adminName: string;
   targetId: string;
@@ -43,6 +44,7 @@ export type ImpersonationContext = {
 type SessionClaims = {
   userId: string;
   impersonatorId: string | null;
+  platformImpersonatorId: string | null;
 };
 
 /** Merkt App-Aktivität für die Statistik – höchstens alle 30 Sekunden. */
@@ -98,7 +100,11 @@ async function readSessionClaims(): Promise<SessionClaims | null> {
       typeof payload.imp === "string" && payload.imp.length > 0
         ? payload.imp
         : null;
-    return { userId, impersonatorId };
+    const platformImpersonatorId =
+      typeof payload.pimp === "string" && payload.pimp.length > 0
+        ? payload.pimp
+        : null;
+    return { userId, impersonatorId, platformImpersonatorId };
   } catch {
     return null;
   }
@@ -112,7 +118,7 @@ export async function setSessionCookie(
     email: string;
     role: "USER" | "ADMIN";
   },
-  options?: { impersonatorId?: string },
+  options?: { impersonatorId?: string; platformImpersonatorId?: string },
 ) {
   const token = await createSessionToken(user, options);
   const store = await cookies();
@@ -147,7 +153,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   if (!user) return null;
 
   // Simulation darf die Aktivitätsstatistik des Mitglieds nicht verfälschen.
-  if (!claims.impersonatorId) {
+  if (!claims.impersonatorId && !claims.platformImpersonatorId) {
     try {
       await touchDailyPresence(
         user.id,
@@ -172,7 +178,30 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
 export const getImpersonationContext = cache(
   async (): Promise<ImpersonationContext | null> => {
     const claims = await readSessionClaims();
-    if (!claims?.impersonatorId) return null;
+    if (!claims) return null;
+
+    if (claims.platformImpersonatorId) {
+      const [admin, target] = await Promise.all([
+        prisma.platformAdmin.findUnique({
+          where: { id: claims.platformImpersonatorId },
+          select: { id: true, name: true },
+        }),
+        prisma.user.findUnique({
+          where: { id: claims.userId },
+          select: { id: true, name: true },
+        }),
+      ]);
+      if (!admin || !target) return null;
+      return {
+        mode: "platform" as const,
+        adminId: admin.id,
+        adminName: admin.name,
+        targetId: target.id,
+        targetName: target.name,
+      };
+    }
+
+    if (!claims.impersonatorId) return null;
 
     const [admin, target] = await Promise.all([
       prisma.user.findUnique({
@@ -188,6 +217,7 @@ export const getImpersonationContext = cache(
     if (!admin || admin.role !== "ADMIN" || !target) return null;
 
     return {
+      mode: "member" as const,
       adminId: admin.id,
       adminName: admin.name,
       targetId: target.id,
@@ -224,5 +254,10 @@ export async function requireCourseManager() {
 /** Liest den JWT-Impersonator für Start/Stop-Actions (ohne getCurrentUser-Cache). */
 export async function getSessionImpersonatorId() {
   const claims = await readSessionClaims();
-  return claims?.impersonatorId ?? null;
+  return claims?.impersonatorId ?? claims?.platformImpersonatorId ?? null;
+}
+
+export async function getSessionPlatformImpersonatorId() {
+  const claims = await readSessionClaims();
+  return claims?.platformImpersonatorId ?? null;
 }

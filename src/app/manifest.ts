@@ -1,17 +1,18 @@
 import type { MetadataRoute } from "next";
-import { getPublicAppUrl } from "@/lib/stripe";
+import { clubDisplayName } from "@/lib/club-settings";
+import { getAppUrl } from "@/lib/stripe";
 
-export default function manifest(): MetadataRoute.Manifest {
-  const origin = getPublicAppUrl().replace(/\/$/, "");
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const origin = (await getAppUrl()).replace(/\/$/, "");
+  const name = await clubDisplayName();
   const manifestUrl = origin
     ? `${origin}/manifest.webmanifest`
     : "/manifest.webmanifest";
 
   return {
-    name: "ASC Lajen",
-    short_name: "ASC Lajen",
-    description:
-      "Kursanmeldungen für Mitglieder des ASC Lajen Raiffeisen – buchen und online bezahlen.",
+    name,
+    short_name: name,
+    description: `${name} – Kurse, Mitgliedschaften und Buchungen.`,
     start_url: "/",
     scope: "/",
     id: "/",

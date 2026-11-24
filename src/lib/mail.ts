@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { PASSWORD_RESET_HOURS } from "@/lib/password-reset-config";
 
 export type MailDeliveryResult =
@@ -25,16 +26,43 @@ const BLOCKED_RECIPIENT_HOSTS = new Set([
 
 const SMTP_TIMEOUT_MS = 12_000;
 
-/** Read env and strip accidental surrounding quotes from Render/.env copy-paste. */
-function env(name: string) {
-  let value = process.env[name]?.trim() ?? "";
-  if (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
-  ) {
-    value = value.slice(1, -1).trim();
+type MailOverlay = Record<string, string> | null;
+const mailAls = new AsyncLocalStorage<MailOverlay>();
+
+async function mailContext<T>(fn: () => Promise<T> | T): Promise<T> {
+  if (mailAls.getStore() !== undefined) return await fn();
+  const { mailEnvOverlay } = await import("@/lib/club-settings");
+  const overlay = await mailEnvOverlay();
+  return mailAls.run(overlay, async () => fn());
+}
+
+async function clubMailName() {
+  try {
+    const { clubDisplayName } = await import("@/lib/club-settings");
+    return await clubDisplayName();
+  } catch {
+    return "Sportverein";
   }
-  return value;
+}
+
+function stripQuotes(value: string) {
+  let next = value.trim();
+  if (
+    (next.startsWith('"') && next.endsWith('"')) ||
+    (next.startsWith("'") && next.endsWith("'"))
+  ) {
+    next = next.slice(1, -1).trim();
+  }
+  return next;
+}
+
+/** Vereins-Einstellungen, sonst Prozess-Umgebung. */
+function env(name: string) {
+  const overlay = mailAls.getStore();
+  if (overlay && Object.prototype.hasOwnProperty.call(overlay, name)) {
+    return stripQuotes(overlay[name] ?? "");
+  }
+  return stripQuotes(process.env[name] ?? "");
 }
 
 function smtpPass() {
@@ -84,7 +112,7 @@ function resolveFromRaw() {
   const configured = env("MAIL_FROM");
   if (configured) return configured;
   const smtpUser = env("SMTP_USER");
-  if (smtpUser.includes("@")) return `ASC Lajen <${smtpUser}>`;
+  if (smtpUser.includes("@")) return smtpUser;
   return "";
 }
 
@@ -103,7 +131,7 @@ function mailProvider(): MailProvider | null {
   return null;
 }
 
-export function isMailConfigured() {
+function isMailConfiguredSync() {
   const provider = mailProvider();
   if (provider === "brevo") return brevoReady();
   if (provider === "resend") return resendReady();
@@ -111,9 +139,13 @@ export function isMailConfigured() {
   return false;
 }
 
+export async function isMailConfigured() {
+  return mailContext(() => isMailConfiguredSync());
+}
+
 /** Human-readable hint when mail is not ready (shown in UI). */
-export function mailConfigIssue(): string | null {
-  if (isMailConfigured()) return null;
+function mailConfigIssueSync(): string | null {
+  if (isMailConfiguredSync()) return null;
 
   if (env("MAIL_PROVIDER").toLowerCase() === "brevo" || env("BREVO_API_KEY")) {
     if (!env("BREVO_API_KEY")) return "BREVO_API_KEY fehlt in Render.";
@@ -137,7 +169,11 @@ export function mailConfigIssue(): string | null {
     return "RESEND_API_KEY ist gesetzt, aber MAIL_FROM fehlt (verifizierte Domain, nicht @gmail.com).";
   }
 
-  return "E-Mail nicht konfiguriert. Empfohlen auf Render: BREVO_API_KEY + MAIL_FROM (z. B. ASC Lajen <app@asclajen.com>, Domain in Brevo verifizieren). SMTP von Render Free hängt meist.";
+  return "E-Mail nicht konfiguriert. Empfohlen: Brevo-API-Key und Absender in den Vereinseinstellungen. SMTP ist auf kleinen Hosting-Plänen oft blockiert.";
+}
+
+export async function mailConfigIssue() {
+  return mailContext(() => mailConfigIssueSync());
 }
 
 function mailFromEmail(): string | null {
@@ -173,11 +209,12 @@ function collectMailWarnings(provider: MailProvider | null): string[] {
 }
 
 /** Status for admin UI – no secrets. */
-export function getMailStatus(): MailStatus {
+export async function getMailStatus(): Promise<MailStatus> {
+  return mailContext(() => {
   const provider = mailProvider();
-  const configured = isMailConfigured();
+  const configured = isMailConfiguredSync();
   const fromAddress = mailFromEmail();
-  const issue = configured ? null : mailConfigIssue();
+  const issue = configured ? null : mailConfigIssueSync();
   const warnings = collectMailWarnings(provider);
   if (configured && provider === "brevo") {
     warnings.push(
@@ -185,6 +222,7 @@ export function getMailStatus(): MailStatus {
     );
   }
   return { configured, provider, fromAddress, issue, warnings };
+  });
 }
 
 function validateFromForProvider(
@@ -293,7 +331,7 @@ async function sendViaBrevo(options: OutgoingMail): Promise<MailDeliveryResult> 
   const apiKey = env("BREVO_API_KEY");
   const sender = parseFromAddress(options.from);
   if (!apiKey || !sender) {
-    return { sent: false, message: mailConfigIssue() ?? "Brevo unvollständig." };
+    return { sent: false, message: mailConfigIssueSync() ?? "Brevo unvollständig." };
   }
 
   const attachment = brevoAttachmentPayload(options.attachments);
@@ -308,11 +346,18 @@ async function sendViaBrevo(options: OutgoingMail): Promise<MailDeliveryResult> 
       sender: sender.name
         ? { name: sender.name, email: sender.email }
         : { email: sender.email },
-      replyTo: { email: sender.email, name: sender.name ?? "ASC Lajen" },
+      replyTo: { email: sender.email, name: sender.name ?? sender.email },
       to: [{ email: options.to }],
       subject: options.subject,
       htmlContent: options.html,
       textContent: options.text,
+      // Klick- und Öffnungs-Tracking hängt sendibt3.com an die Mail.
+      // Postfächer legen solche Registrierungsmails in den Spam.
+      headers: {
+        "X-Mailin-Track": "false",
+        "X-Mailin-Track-Clicks": "false",
+        "X-Mailin-Track-Opens": "false",
+      },
       ...(attachment ? { attachment } : {}),
     }),
   });
@@ -342,7 +387,7 @@ async function sendViaSmtp(options: OutgoingMail): Promise<MailDeliveryResult> {
   if (!smtpReady()) {
     return {
       sent: false,
-      message: mailConfigIssue() ?? "SMTP unvollständig konfiguriert.",
+      message: mailConfigIssueSync() ?? "SMTP unvollständig konfiguriert.",
     };
   }
 
@@ -455,6 +500,16 @@ export async function sendMail(options: {
   html: string;
   attachments?: MailAttachment[];
 }): Promise<MailDeliveryResult> {
+  return mailContext(() => deliverMail(options));
+}
+
+async function deliverMail(options: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  attachments?: MailAttachment[];
+}): Promise<MailDeliveryResult> {
   if (!isSendableEmail(options.to)) {
     return {
       sent: false,
@@ -464,11 +519,11 @@ export async function sendMail(options: {
   }
 
   const provider = mailProvider();
-  if (!provider || !isMailConfigured()) {
+  if (!provider || !isMailConfiguredSync()) {
     return {
       sent: false,
       message:
-        mailConfigIssue() ??
+        mailConfigIssueSync() ??
         "E-Mail-Versand ist nicht konfiguriert.",
     };
   }
@@ -488,11 +543,21 @@ export async function sendMail(options: {
   return sendViaSmtp({ from: fromResult.from, ...options });
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/"/g, "&quot;");
+}
+
 export async function sendVerificationEmail(to: string, confirmUrl: string) {
-  const subject = "Bitte bestätigen Sie Ihre E-Mail – ASC Lajen";
-  const text = `Guten Tag,\n\nbitte bestätigen Sie Ihre E-Mail-Adresse für den ASC Lajen und legen Sie danach Ihr Passwort fest:\n${confirmUrl}\n\nDer Link gilt 48 Stunden.\n\nASC Lajen Raiffeisen`;
-  const href = confirmUrl.replace(/&/g, "&amp;");
-  const html = `<p>Guten Tag,</p><p>bitte bestätigen Sie Ihre E-Mail-Adresse für den ASC Lajen und legen Sie danach Ihr Passwort fest:</p><p><a href="${href}">E-Mail bestätigen und Passwort setzen</a></p><p>Der Link gilt 48 Stunden.</p><p>ASC Lajen Raiffeisen</p>`;
+  const club = await clubMailName();
+  const safeClub = escapeHtml(club);
+  const subject = `Bitte bestätigen Sie Ihre E-Mail – ${club}`;
+  const text = `Guten Tag,\n\nbitte bestätigen Sie Ihre E-Mail-Adresse für ${club} und legen Sie danach Ihr Passwort fest. Kopieren Sie diese Adresse in den Browser:\n${confirmUrl}\n\nDer Link gilt 48 Stunden.\n\n${club}`;
+  const href = escapeHtml(confirmUrl);
+  // Kein <a href>: Brevo ersetzt den Link sonst durch sendibt3.com, die Mail landet im Spam.
+  const html = `<p>Guten Tag,</p><p>bitte bestätigen Sie Ihre E-Mail-Adresse für ${safeClub} und legen Sie danach Ihr Passwort fest. Kopieren Sie diese Adresse in den Browser:</p><p>${href}</p><p>Der Link gilt 48 Stunden.</p><p>${safeClub}</p>`;
   return sendMail({ to, subject, text, html });
 }
 
@@ -501,19 +566,21 @@ export async function sendAccountInviteEmail(
   name: string,
   confirmUrl: string,
 ) {
-  const subject = "Ihr Familienkonto beim ASC Lajen";
+  const club = await clubMailName();
+  const subject = `Ihr Familienkonto bei ${club}`;
   const safeName = name.trim() || "Mitglied";
-  const text = `Guten Tag ${safeName},\n\nfür Sie wurde ein Zugang zum Familienkonto beim ASC Lajen angelegt.\nBitte öffnen Sie den Link und legen Sie Ihr Passwort fest:\n${confirmUrl}\n\nDer Link gilt 48 Stunden.\n\nASC Lajen Raiffeisen`;
-  const href = confirmUrl.replace(/&/g, "&amp;");
-  const html = `<p>Guten Tag ${safeName.replace(/</g, "&lt;")},</p><p>für Sie wurde ein Zugang zum Familienkonto beim ASC Lajen angelegt.</p><p>Bitte öffnen Sie den Link und legen Sie Ihr Passwort fest:</p><p><a href="${href}">Passwort festlegen und anmelden</a></p><p>Der Link gilt 48 Stunden.</p><p>ASC Lajen Raiffeisen</p>`;
+  const text = `Guten Tag ${safeName},\n\nfür Sie wurde ein Zugang zum Familienkonto bei ${club} angelegt.\nBitte kopieren Sie diese Adresse in den Browser und legen Sie Ihr Passwort fest:\n${confirmUrl}\n\nDer Link gilt 48 Stunden.\n\n${club}`;
+  const href = escapeHtml(confirmUrl);
+  const html = `<p>Guten Tag ${escapeHtml(safeName)},</p><p>für Sie wurde ein Zugang zum Familienkonto bei ${escapeHtml(club)} angelegt.</p><p>Bitte kopieren Sie diese Adresse in den Browser und legen Sie Ihr Passwort fest:</p><p>${href}</p><p>Der Link gilt 48 Stunden.</p><p>${escapeHtml(club)}</p>`;
   return sendMail({ to, subject, text, html });
 }
 
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
-  const subject = "Passwort zurücksetzen – ASC Lajen";
-  const text = `Guten Tag,\n\nSie haben ein neues Passwort für den ASC Lajen angefordert. Öffnen Sie den Link und legen Sie ein neues Passwort fest:\n${resetUrl}\n\nDer Link gilt ${PASSWORD_RESET_HOURS} Stunden. Wenn Sie das nicht waren, können Sie diese E-Mail ignorieren.\n\nASC Lajen Raiffeisen`;
-  const href = resetUrl.replace(/&/g, "&amp;");
-  const html = `<p>Guten Tag,</p><p>Sie haben ein neues Passwort für den ASC Lajen angefordert. Öffnen Sie den Link und legen Sie ein neues Passwort fest:</p><p><a href="${href}">Neues Passwort festlegen</a></p><p>Der Link gilt ${PASSWORD_RESET_HOURS} Stunden. Wenn Sie das nicht waren, können Sie diese E-Mail ignorieren.</p><p>ASC Lajen Raiffeisen</p>`;
+  const club = await clubMailName();
+  const subject = `Passwort zurücksetzen – ${club}`;
+  const text = `Guten Tag,\n\nSie haben ein neues Passwort für ${club} angefordert. Kopieren Sie diese Adresse in den Browser und legen Sie ein neues Passwort fest:\n${resetUrl}\n\nDer Link gilt ${PASSWORD_RESET_HOURS} Stunden. Wenn Sie das nicht waren, können Sie diese E-Mail ignorieren.\n\n${club}`;
+  const href = escapeHtml(resetUrl);
+  const html = `<p>Guten Tag,</p><p>Sie haben ein neues Passwort für ${escapeHtml(club)} angefordert. Kopieren Sie diese Adresse in den Browser und legen Sie ein neues Passwort fest:</p><p>${href}</p><p>Der Link gilt ${PASSWORD_RESET_HOURS} Stunden. Wenn Sie das nicht waren, können Sie diese E-Mail ignorieren.</p><p>${escapeHtml(club)}</p>`;
   return sendMail({ to, subject, text, html });
 }
 
@@ -528,13 +595,21 @@ export async function passwordResetLink(token: string, nextPath?: string) {
   return `${appUrl}/passwort-zuruecksetzen?${params.toString()}`;
 }
 
-export async function verificationLink(token: string, nextPath?: string) {
+export async function verificationLink(
+  token: string,
+  nextPath?: string,
+  clubSlug?: string,
+) {
   const { getAppUrl } = await import("@/lib/stripe");
   const appUrl = await getAppUrl();
   const params = new URLSearchParams();
   params.set("token", token);
   if (nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")) {
     params.set("next", nextPath);
+  }
+  const slug = clubSlug?.trim().toLowerCase() ?? "";
+  if (slug && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+    params.set("club", slug);
   }
   // Query-Param: JWT enthält Punkte – im Pfad oft problematisch für Mail-Tracker.
   return `${appUrl}/bestaetigen?${params.toString()}`;

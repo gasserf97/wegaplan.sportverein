@@ -1,3 +1,4 @@
+import { registrationBackupEmailSetting, clubDisplayName } from "@/lib/club-settings";
 import { formatDateTime, formatShortDate } from "@/lib/format";
 import { isMailConfigured, isSendableEmail, sendMail } from "@/lib/mail";
 import { buildMembersExportWorkbook } from "@/lib/members-export";
@@ -27,15 +28,24 @@ function parseRecipientList(raw: string | null | undefined) {
     .filter(Boolean);
 }
 
-export function registrationBackupRecipients(override?: string | null) {
+export async function registrationBackupRecipients(override?: string | null) {
   const fromOverride = parseRecipientList(override);
-  const fromEnv = parseRecipientList(process.env.REGISTRATION_BACKUP_EMAIL);
+  const clubSetting = await registrationBackupEmailSetting();
+  const fromClub = clubSetting == null ? [] : parseRecipientList(clubSetting);
+  const fromEnv =
+    clubSetting == null
+      ? parseRecipientList(process.env.REGISTRATION_BACKUP_EMAIL)
+      : [];
   const candidates =
     fromOverride.length > 0
       ? fromOverride
-      : fromEnv.length > 0
-        ? fromEnv
-        : [DEFAULT_REGISTRATION_BACKUP_EMAIL];
+      : fromClub.length > 0
+        ? fromClub
+        : fromEnv.length > 0
+          ? fromEnv
+          : clubSetting == null
+            ? [DEFAULT_REGISTRATION_BACKUP_EMAIL]
+            : [];
   const unique = [...new Set(candidates.map((item) => item.toLowerCase()))];
   const invalid = unique.filter((email) => !isSendableEmail(email));
   const recipients = unique.filter((email) => isSendableEmail(email));
@@ -276,6 +286,7 @@ function backupEmailCopy(input: {
   planCount: number;
   subscriptionCount: number;
   memberCount: number;
+  clubName: string;
 }) {
   const when = formatDateTime(input.createdAt);
   const subject = `Backup Abos, Kurse und Mitglieder – ${formatShortDate(input.createdAt)}`;
@@ -289,7 +300,7 @@ function backupEmailCopy(input: {
     `Dateien:\n` +
     `– ${input.registrationsFilename} (jedes Blatt = Kurs oder Abo)\n` +
     `– ${input.membersFilename} (Mitglieder + Mitgliedschaften)\n\n` +
-    `ASC Lajen Raiffeisen`;
+    `${input.clubName}`;
   const html =
     `<p>Guten Tag,</p>` +
     `<p>im Anhang finden Sie das Backup der Anmeldungen und der Mitgliederverwaltung.</p>` +
@@ -301,12 +312,12 @@ function backupEmailCopy(input: {
     `<li><strong>${input.registrationsFilename}</strong> – jedes Blatt ist ein Kurs oder ein Abo</li>` +
     `<li><strong>${input.membersFilename}</strong> – Mitglieder und Mitgliedschaften</li>` +
     `</ul>` +
-    `<p>ASC Lajen Raiffeisen</p>`;
+    `<p>${input.clubName}</p>`;
   return { subject, text, html };
 }
 
 export async function sendRegistrationBackupEmail(options?: { to?: string | null }) {
-  const { recipients, invalid } = registrationBackupRecipients(options?.to);
+  const { recipients, invalid } = await registrationBackupRecipients(options?.to);
   if (recipients.length === 0) {
     return {
       ok: false as const,
@@ -316,9 +327,10 @@ export async function sendRegistrationBackupEmail(options?: { to?: string | null
           : "Keine gültige Empfängeradresse für das Backup.",
     };
   }
-  if (!isMailConfigured()) {
+  if (!(await isMailConfigured())) {
     return {
       ok: false as const,
+      reason: "not_configured" as const,
       message: "E-Mail-Versand ist nicht konfiguriert.",
     };
   }
@@ -337,6 +349,7 @@ export async function sendRegistrationBackupEmail(options?: { to?: string | null
     planCount: workbook.planCount,
     subscriptionCount: workbook.subscriptionCount,
     memberCount: members.memberCount,
+    clubName: await clubDisplayName(),
   });
   const attachments = [
     {

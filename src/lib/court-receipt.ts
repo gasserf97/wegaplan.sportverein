@@ -184,9 +184,9 @@ export async function sendCourtReservationReceipt(
     };
   }
 
-  if (!isMailConfigured()) {
+  if (!(await isMailConfigured())) {
     const message =
-      mailConfigIssue() ?? "E-Mail-Versand ist nicht konfiguriert.";
+      (await mailConfigIssue()) ?? "E-Mail-Versand ist nicht konfiguriert.";
     console.error("Tennis-Quittung", reservationId, message);
     return { sent: false, message };
   }

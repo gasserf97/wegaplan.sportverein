@@ -7,14 +7,91 @@ import {
   sessionCookieSecure,
 } from "@/lib/session-token";
 
+import {
+  CLUB_PREVIEW_COOKIE,
+  CLUB_PREVIEW_HEADER,
+  isPlatformHost,
+  normalizeHostHeader,
+  publicUrlFromRequest,
+  slugFromHost,
+} from "@/lib/host";
+
+function clubSlugFromQuery(request: NextRequest) {
+  const raw = request.nextUrl.searchParams.get("club")?.trim().toLowerCase() ?? "";
+  if (!raw || raw.includes(".") || raw.includes("/")) return "";
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(raw)) return "";
+  return raw;
+}
+
 /** Forward pathname so the root layout can enforce the Stammdaten gate. */
 export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-pathname", request.nextUrl.pathname);
+  const host = normalizeHostHeader(
+    request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "",
+  );
+  requestHeaders.set("x-club-host", host);
+
+  const path = request.nextUrl.pathname;
+  const onPlatform = isPlatformHost(host);
+  const queryClub =
+    path.startsWith("/bestaetigen") || path.startsWith("/passwort-zuruecksetzen")
+      ? clubSlugFromQuery(request)
+      : "";
+  const cookiePreview =
+    request.cookies.get(CLUB_PREVIEW_COOKIE)?.value?.trim().toLowerCase() ?? "";
+  const preview =
+    queryClub ||
+    (cookiePreview && !cookiePreview.includes(".") && !cookiePreview.includes("/")
+      ? cookiePreview
+      : "");
+  if (preview) {
+    requestHeaders.set(CLUB_PREVIEW_HEADER, preview);
+  }
+
+  if (request.method === "GET" && onPlatform && path.startsWith("/vereine")) {
+    const response = NextResponse.next({
+      request: { headers: requestHeaders },
+    });
+    // Plattform-UI: Vorschau-Cookie löschen, damit /vereine wieder Betreiber ist.
+    response.cookies.set(CLUB_PREVIEW_COOKIE, "", {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      secure: sessionCookieSecure(),
+      maxAge: 0,
+    });
+    return withSessionRenewal(request, response);
+  }
+
+  if (
+    request.method === "GET" &&
+    onPlatform &&
+    !preview &&
+    !path.startsWith("/vereine") &&
+    !path.startsWith("/api")
+  ) {
+    return NextResponse.redirect(publicUrlFromRequest(request, "/vereine"));
+  }
+  if (request.method === "GET" && slugFromHost(host) && path.startsWith("/vereine")) {
+    return NextResponse.redirect(publicUrlFromRequest(request, "/"));
+  }
   const response = NextResponse.next({
     request: { headers: requestHeaders },
   });
+  if (queryClub) {
+    response.cookies.set(CLUB_PREVIEW_COOKIE, queryClub, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      secure: sessionCookieSecure(),
+      maxAge: 60 * 60 * 12,
+    });
+  }
+  return withSessionRenewal(request, response);
+}
 
+async function withSessionRenewal(request: NextRequest, response: NextResponse) {
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   if (!token) return response;
 

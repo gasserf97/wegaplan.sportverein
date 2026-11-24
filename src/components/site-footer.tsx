@@ -6,8 +6,16 @@ import { useI18n } from "@/components/locale-provider";
 
 export function SiteFooter({
   reserveTabBar = false,
+  clubName = "Sportverein",
+  impressumUrl = "",
+  showLegacyTagline = false,
+  clubLogoUrl = null,
 }: {
   reserveTabBar?: boolean;
+  clubName?: string;
+  impressumUrl?: string;
+  showLegacyTagline?: boolean;
+  clubLogoUrl?: string | null;
 }) {
   const { t } = useI18n();
 
@@ -16,13 +24,13 @@ export function SiteFooter({
       <div className="mx-auto hidden w-full max-w-6xl flex-col gap-4 px-4 py-8 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-6 md:flex">
         <div className="flex items-center gap-3">
           <span className="rounded-md bg-white p-1.5">
-            <ClubLogo variant="icon" href={null} className="size-10" />
+            <ClubLogo variant="icon" href={null} src={clubLogoUrl} className="size-10" />
           </span>
           <div>
-            <p className="font-heading font-semibold text-white">
-              ASC Lajen Raiffeisen
-            </p>
-            <p className="text-white/70">{t("nav.footerClub")}</p>
+            <p className="font-heading font-semibold text-white">{clubName}</p>
+            {showLegacyTagline ? (
+              <p className="text-white/70">{t("nav.footerClub")}</p>
+            ) : null}
           </div>
         </div>
         <div className="flex flex-col gap-2 sm:items-end">
@@ -34,14 +42,16 @@ export function SiteFooter({
             >
               {t("nav.privacy")}
             </Link>
-            <a
-              href="https://asclajen.com/impressum"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-white/80 underline-offset-4 hover:text-white hover:underline"
-            >
-              {t("nav.impressum")}
-            </a>
+            {impressumUrl ? (
+              <a
+                href={impressumUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-white/80 underline-offset-4 hover:text-white hover:underline"
+              >
+                {t("nav.impressum")}
+              </a>
+            ) : null}
           </div>
         </div>
       </div>

@@ -152,7 +152,7 @@ export function CourseForm({
         <p className="text-xs text-muted-foreground">
           Nur Sektions-Admins können Kurse für ihre Sektion anlegen. Die
           Kartenfarbe kommt von der Sektion. Zahlung läuft über die
-          Zahlungsdaten im Render Environment.
+          Zahlungsdaten in den Vereinseinstellungen des Betreibers.
         </p>
       </div>
       <div className="grid gap-2">

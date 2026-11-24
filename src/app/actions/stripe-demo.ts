@@ -11,7 +11,7 @@ import {
 import { isStripeDemoMode } from "@/lib/stripe";
 
 export async function confirmShowcasePaymentAction(formData: FormData) {
-  if (!isStripeDemoMode()) {
+  if (!(await isStripeDemoMode())) {
     redirect("/");
   }
 

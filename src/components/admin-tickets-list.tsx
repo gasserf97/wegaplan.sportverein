@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { TicketStatusButton } from "@/components/ticket-status-button";
 import { TicketReplyButton } from "@/components/ticket-reply-button";
+import { TicketForwardButton } from "@/components/ticket-forward-button";
 import { useI18n } from "@/components/locale-provider";
 import { formatDateTime } from "@/lib/format";
 import type { Locale } from "@/lib/i18n/types";
@@ -25,7 +26,64 @@ export type AdminTicketRow = {
   closedAt: string | null;
   closedBy: { name: string; username: string } | null;
   user: { name: string; email: string; username: string };
+  forwardedAt: string | null;
+  forwardNote: string;
+  platformStatus: "OPEN" | "CLOSED";
+  platformReplies: {
+    id: string;
+    body: string;
+    authorName: string;
+    createdAt: string;
+  }[];
 };
+
+function TicketForwardMeta({
+  ticket,
+  locale,
+}: {
+  ticket: AdminTicketRow;
+  locale: Locale;
+}) {
+  const { t } = useI18n();
+  if (!ticket.forwardedAt) return null;
+  return (
+    <p className="text-xs text-primary">
+      {t("admin.ticketForwarded")}{" "}
+      {formatDateTime(new Date(ticket.forwardedAt), locale)}
+      {ticket.platformStatus === "CLOSED"
+        ? ` · ${t("admin.ticketForwardDone")}`
+        : null}
+    </p>
+  );
+}
+
+function TicketPlatformReplies({
+  ticket,
+  locale,
+}: {
+  ticket: AdminTicketRow;
+  locale: Locale;
+}) {
+  const { t } = useI18n();
+  if (ticket.platformReplies.length === 0) return null;
+  return (
+    <ul className="grid gap-2">
+      {ticket.platformReplies.map((reply) => (
+        <li
+          key={reply.id}
+          className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm"
+        >
+          <p className="text-xs font-medium text-primary">
+            {t("admin.ticketPlatformReply")} ·{" "}
+            {formatDateTime(new Date(reply.createdAt), locale)} ·{" "}
+            {t("admin.ticketPlatformReplyBy", { name: reply.authorName })}
+          </p>
+          <p className="mt-1 break-words whitespace-pre-wrap">{reply.body}</p>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function TicketTable({
   tickets,
@@ -75,6 +133,7 @@ function TicketTable({
             <p className="rounded-lg bg-muted/40 p-3 text-sm break-words whitespace-pre-wrap">
               {ticket.message}
             </p>
+            <TicketPlatformReplies ticket={ticket} locale={locale} />
             {showClosedMeta && ticket.closedAt && ticket.closedBy ? (
               <p className="text-xs text-muted-foreground">
                 {t("admin.ticketClosedAt")}:{" "}
@@ -82,12 +141,18 @@ function TicketTable({
                 {t("admin.ticketClosedBy", { name: ticket.closedBy.name })}
               </p>
             ) : null}
-            <div className="grid gap-2 sm:grid-cols-2">
+            <TicketForwardMeta ticket={ticket} locale={locale} />
+            <div className="grid gap-2">
               <TicketReplyButton
                 ticketId={ticket.id}
                 recipientName={ticket.user.name}
                 recipientEmail={ticket.user.email}
                 subject={ticket.subject}
+              />
+              <TicketForwardButton
+                ticketId={ticket.id}
+                forwarded={Boolean(ticket.forwardedAt)}
+                forwardNote={ticket.forwardNote}
               />
               {showStatusToggle ? (
                 <TicketStatusButton
@@ -114,7 +179,7 @@ function TicketTable({
                 </TableHead>
               ) : null}
               <TableHead className="w-[4.5rem]">{t("common.status")}</TableHead>
-              <TableHead className="w-[7.5rem]">
+              <TableHead className="w-[9.5rem]">
                 {t("common.actions")}
               </TableHead>
               <TableHead>{t("support.message")}</TableHead>
@@ -174,6 +239,11 @@ function TicketTable({
                       recipientEmail={ticket.user.email}
                       subject={ticket.subject}
                     />
+                    <TicketForwardButton
+                      ticketId={ticket.id}
+                      forwarded={Boolean(ticket.forwardedAt)}
+                      forwardNote={ticket.forwardNote}
+                    />
                     {showStatusToggle ? (
                       <TicketStatusButton
                         ticketId={ticket.id}
@@ -181,9 +251,13 @@ function TicketTable({
                       />
                     ) : null}
                   </div>
+                  <TicketForwardMeta ticket={ticket} locale={locale} />
                 </TableCell>
                 <TableCell className="break-words whitespace-pre-wrap text-sm">
-                  {ticket.message}
+                  <p>{ticket.message}</p>
+                  <div className="mt-2">
+                    <TicketPlatformReplies ticket={ticket} locale={locale} />
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

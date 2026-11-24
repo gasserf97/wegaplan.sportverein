@@ -1260,8 +1260,8 @@ export async function fulfillStripeSubscriptionInvoice(
         const stripeFeeCents =
           invoice?.id != null
             ? (await fetchStripeFeeFromInvoice(invoice.id)) ??
-              estimateStripeFeeCents(amountCents)
-            : estimateStripeFeeCents(amountCents);
+              (await estimateStripeFeeCents(amountCents))
+            : await estimateStripeFeeCents(amountCents);
         await recordSubscriptionPayment({
           subscriptionId: subscription.id,
           amountCents,
@@ -1321,8 +1321,8 @@ export async function fulfillStripeSubscriptionInvoice(
       const stripeFeeCents =
         invoice?.id != null
           ? (await fetchStripeFeeFromInvoice(invoice.id)) ??
-            estimateStripeFeeCents(amountCents)
-          : estimateStripeFeeCents(amountCents);
+            (await estimateStripeFeeCents(amountCents))
+          : await estimateStripeFeeCents(amountCents);
       await recordSubscriptionPayment({
         subscriptionId: subscription.id,
         amountCents,
