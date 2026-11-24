@@ -26,6 +26,13 @@ const BLOCKED_RECIPIENT_HOSTS = new Set([
 const SMTP_TIMEOUT_MS = 12_000;
 
 /** Read env and strip accidental surrounding quotes from Render/.env copy-paste. */
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/"/g, "&quot;");
+}
+
 function env(name: string) {
   let value = process.env[name]?.trim() ?? "";
   if (
@@ -313,6 +320,14 @@ async function sendViaBrevo(options: OutgoingMail): Promise<MailDeliveryResult> 
       subject: options.subject,
       htmlContent: options.html,
       textContent: options.text,
+      // Brevo ersetzt sonst jeden Link durch sendibt3.com/tr/cl/… und setzt
+      // ein Zählpixel sendibt3.com/tr/op/…. In Mail-Apps ist das der einzige
+      // sichtbare Link und öffnet nicht die App.
+      headers: {
+        "X-Mailin-Track": "false",
+        "X-Mailin-Track-Clicks": "false",
+        "X-Mailin-Track-Opens": "false",
+      },
       ...(attachment ? { attachment } : {}),
     }),
   });
@@ -490,9 +505,10 @@ export async function sendMail(options: {
 
 export async function sendVerificationEmail(to: string, confirmUrl: string) {
   const subject = "Bitte bestätigen Sie Ihre E-Mail – ASC Lajen";
-  const text = `Guten Tag,\n\nbitte bestätigen Sie Ihre E-Mail-Adresse für den ASC Lajen und legen Sie danach Ihr Passwort fest:\n${confirmUrl}\n\nDer Link gilt 48 Stunden.\n\nASC Lajen Raiffeisen`;
-  const href = confirmUrl.replace(/&/g, "&amp;");
-  const html = `<p>Guten Tag,</p><p>bitte bestätigen Sie Ihre E-Mail-Adresse für den ASC Lajen und legen Sie danach Ihr Passwort fest:</p><p><a href="${href}">E-Mail bestätigen und Passwort setzen</a></p><p>Der Link gilt 48 Stunden.</p><p>ASC Lajen Raiffeisen</p>`;
+  const text = `Guten Tag,\n\nbitte bestätigen Sie Ihre E-Mail-Adresse für den ASC Lajen und legen Sie danach Ihr Passwort fest. Kopieren Sie diese Adresse in den Browser:\n${confirmUrl}\n\nDer Link gilt 48 Stunden.\n\nASC Lajen Raiffeisen`;
+  const href = escapeHtml(confirmUrl);
+  // Kein <a href>: Brevo hängt daran die Tracking-Adresse und ersetzt den echten Link.
+  const html = `<p>Guten Tag,</p><p>bitte bestätigen Sie Ihre E-Mail-Adresse für den ASC Lajen und legen Sie danach Ihr Passwort fest. Kopieren Sie diese Adresse in den Browser:</p><p>${href}</p><p>Der Link gilt 48 Stunden.</p><p>ASC Lajen Raiffeisen</p>`;
   return sendMail({ to, subject, text, html });
 }
 
@@ -503,17 +519,17 @@ export async function sendAccountInviteEmail(
 ) {
   const subject = "Ihr Familienkonto beim ASC Lajen";
   const safeName = name.trim() || "Mitglied";
-  const text = `Guten Tag ${safeName},\n\nfür Sie wurde ein Zugang zum Familienkonto beim ASC Lajen angelegt.\nBitte öffnen Sie den Link und legen Sie Ihr Passwort fest:\n${confirmUrl}\n\nDer Link gilt 48 Stunden.\n\nASC Lajen Raiffeisen`;
-  const href = confirmUrl.replace(/&/g, "&amp;");
-  const html = `<p>Guten Tag ${safeName.replace(/</g, "&lt;")},</p><p>für Sie wurde ein Zugang zum Familienkonto beim ASC Lajen angelegt.</p><p>Bitte öffnen Sie den Link und legen Sie Ihr Passwort fest:</p><p><a href="${href}">Passwort festlegen und anmelden</a></p><p>Der Link gilt 48 Stunden.</p><p>ASC Lajen Raiffeisen</p>`;
+  const text = `Guten Tag ${safeName},\n\nfür Sie wurde ein Zugang zum Familienkonto beim ASC Lajen angelegt.\nBitte kopieren Sie diese Adresse in den Browser und legen Sie Ihr Passwort fest:\n${confirmUrl}\n\nDer Link gilt 48 Stunden.\n\nASC Lajen Raiffeisen`;
+  const href = escapeHtml(confirmUrl);
+  const html = `<p>Guten Tag ${escapeHtml(safeName)},</p><p>für Sie wurde ein Zugang zum Familienkonto beim ASC Lajen angelegt.</p><p>Bitte kopieren Sie diese Adresse in den Browser und legen Sie Ihr Passwort fest:</p><p>${href}</p><p>Der Link gilt 48 Stunden.</p><p>ASC Lajen Raiffeisen</p>`;
   return sendMail({ to, subject, text, html });
 }
 
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   const subject = "Passwort zurücksetzen – ASC Lajen";
-  const text = `Guten Tag,\n\nSie haben ein neues Passwort für den ASC Lajen angefordert. Öffnen Sie den Link und legen Sie ein neues Passwort fest:\n${resetUrl}\n\nDer Link gilt ${PASSWORD_RESET_HOURS} Stunden. Wenn Sie das nicht waren, können Sie diese E-Mail ignorieren.\n\nASC Lajen Raiffeisen`;
-  const href = resetUrl.replace(/&/g, "&amp;");
-  const html = `<p>Guten Tag,</p><p>Sie haben ein neues Passwort für den ASC Lajen angefordert. Öffnen Sie den Link und legen Sie ein neues Passwort fest:</p><p><a href="${href}">Neues Passwort festlegen</a></p><p>Der Link gilt ${PASSWORD_RESET_HOURS} Stunden. Wenn Sie das nicht waren, können Sie diese E-Mail ignorieren.</p><p>ASC Lajen Raiffeisen</p>`;
+  const text = `Guten Tag,\n\nSie haben ein neues Passwort für den ASC Lajen angefordert. Kopieren Sie diese Adresse in den Browser und legen Sie ein neues Passwort fest:\n${resetUrl}\n\nDer Link gilt ${PASSWORD_RESET_HOURS} Stunden. Wenn Sie das nicht waren, können Sie diese E-Mail ignorieren.\n\nASC Lajen Raiffeisen`;
+  const href = escapeHtml(resetUrl);
+  const html = `<p>Guten Tag,</p><p>Sie haben ein neues Passwort für den ASC Lajen angefordert. Kopieren Sie diese Adresse in den Browser und legen Sie ein neues Passwort fest:</p><p>${href}</p><p>Der Link gilt ${PASSWORD_RESET_HOURS} Stunden. Wenn Sie das nicht waren, können Sie diese E-Mail ignorieren.</p><p>ASC Lajen Raiffeisen</p>`;
   return sendMail({ to, subject, text, html });
 }
 
@@ -531,11 +547,18 @@ export async function passwordResetLink(token: string, nextPath?: string) {
 export async function verificationLink(token: string, nextPath?: string) {
   const { getAppUrl } = await import("@/lib/stripe");
   const appUrl = await getAppUrl();
-  const params = new URLSearchParams();
-  params.set("token", token);
-  if (nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")) {
+  // Pfad ohne Punkte und ohne Query: Mail-Programme schneiden JWTs an „.“ ab
+  // und verlieren Parameter hinter „&“.
+  const url = `${appUrl}/bestaetigen/${encodeURIComponent(token)}`;
+  if (
+    nextPath &&
+    nextPath.startsWith("/") &&
+    !nextPath.startsWith("//") &&
+    nextPath !== "/konto/familie"
+  ) {
+    const params = new URLSearchParams();
     params.set("next", nextPath);
+    return `${url}?${params.toString()}`;
   }
-  // Query-Param: JWT enthält Punkte – im Pfad oft problematisch für Mail-Tracker.
-  return `${appUrl}/bestaetigen?${params.toString()}`;
+  return url;
 }

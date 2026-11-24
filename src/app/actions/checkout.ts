@@ -850,7 +850,6 @@ export async function startSubscriptionCheckoutAction(
   }
 
   try {
-    const stripe = await getStripeForSection(plan.sectionId);
     const appUrl = await getAppUrl();
     const payer = await prisma.user.findUnique({
       where: { id: user.id },
@@ -987,6 +986,7 @@ export async function startSubscriptionCheckoutAction(
       return showcasePlan;
     }
 
+    const stripe = await getStripeForSection(plan.sectionId);
     const savePaymentForRenewal =
       autoRenew && plan.autoRenewOffered && !wantsRenew && totalCents > 0;
 
