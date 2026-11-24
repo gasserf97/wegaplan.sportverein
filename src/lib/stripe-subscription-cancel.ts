@@ -99,6 +99,14 @@ export async function syncStripeRecurringToLocalAutoRenew(
   },
   _now = new Date(),
 ) {
+  // Vorführ-Checkout bleibt in der App. Die Session-ID ist kein Stripe-Abo.
+  if (
+    !subscription.stripeSubscriptionId &&
+    subscription.stripeSessionId?.startsWith("cs_test_showcase_")
+  ) {
+    return;
+  }
+
   const stripeSubId = await resolveStripeSubscriptionId(subscription);
   if (!stripeSubId) {
     // Einmalzahlung (Checkout mode=payment) speichert nur stripeSessionId –
@@ -182,6 +190,7 @@ export async function stopEndedStripeRecurring(now = new Date()) {
   const rows = await prisma.subscription.findMany({
     where: {
       autoRenew: false,
+      status: { not: "PENDING" },
       OR: [
         { stripeSubscriptionId: { not: null } },
         { stripeSessionId: { not: null } },
