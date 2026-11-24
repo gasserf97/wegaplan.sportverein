@@ -320,6 +320,14 @@ async function sendViaBrevo(options: OutgoingMail): Promise<MailDeliveryResult> 
       subject: options.subject,
       htmlContent: options.html,
       textContent: options.text,
+      // Brevo ersetzt sonst jeden Link durch sendibt3.com/tr/cl/… und setzt
+      // ein Zählpixel sendibt3.com/tr/op/…. In Mail-Apps ist das der einzige
+      // sichtbare Link und öffnet nicht die App.
+      headers: {
+        "X-Mailin-Track": "false",
+        "X-Mailin-Track-Clicks": "false",
+        "X-Mailin-Track-Opens": "false",
+      },
       ...(attachment ? { attachment } : {}),
     }),
   });
@@ -497,9 +505,10 @@ export async function sendMail(options: {
 
 export async function sendVerificationEmail(to: string, confirmUrl: string) {
   const subject = "Bitte bestätigen Sie Ihre E-Mail – ASC Lajen";
-  const text = `Guten Tag,\n\nbitte bestätigen Sie Ihre E-Mail-Adresse für den ASC Lajen und legen Sie danach Ihr Passwort fest:\n${confirmUrl}\n\nDer Link gilt 48 Stunden.\n\nASC Lajen Raiffeisen`;
+  const text = `Guten Tag,\n\nbitte bestätigen Sie Ihre E-Mail-Adresse für den ASC Lajen und legen Sie danach Ihr Passwort fest. Kopieren Sie diese Adresse in den Browser:\n${confirmUrl}\n\nDer Link gilt 48 Stunden.\n\nASC Lajen Raiffeisen`;
   const href = escapeHtml(confirmUrl);
-  const html = `<p>Guten Tag,</p><p>bitte bestätigen Sie Ihre E-Mail-Adresse für den ASC Lajen und legen Sie danach Ihr Passwort fest:</p><p><a href="${href}">E-Mail bestätigen und Passwort setzen</a></p><p>${href}</p><p>Der Link gilt 48 Stunden.</p><p>ASC Lajen Raiffeisen</p>`;
+  // Kein <a href>: Brevo hängt daran die Tracking-Adresse und ersetzt den echten Link.
+  const html = `<p>Guten Tag,</p><p>bitte bestätigen Sie Ihre E-Mail-Adresse für den ASC Lajen und legen Sie danach Ihr Passwort fest. Kopieren Sie diese Adresse in den Browser:</p><p>${href}</p><p>Der Link gilt 48 Stunden.</p><p>ASC Lajen Raiffeisen</p>`;
   return sendMail({ to, subject, text, html });
 }
 
@@ -510,9 +519,9 @@ export async function sendAccountInviteEmail(
 ) {
   const subject = "Ihr Familienkonto beim ASC Lajen";
   const safeName = name.trim() || "Mitglied";
-  const text = `Guten Tag ${safeName},\n\nfür Sie wurde ein Zugang zum Familienkonto beim ASC Lajen angelegt.\nBitte öffnen Sie den Link und legen Sie Ihr Passwort fest:\n${confirmUrl}\n\nDer Link gilt 48 Stunden.\n\nASC Lajen Raiffeisen`;
+  const text = `Guten Tag ${safeName},\n\nfür Sie wurde ein Zugang zum Familienkonto beim ASC Lajen angelegt.\nBitte kopieren Sie diese Adresse in den Browser und legen Sie Ihr Passwort fest:\n${confirmUrl}\n\nDer Link gilt 48 Stunden.\n\nASC Lajen Raiffeisen`;
   const href = escapeHtml(confirmUrl);
-  const html = `<p>Guten Tag ${escapeHtml(safeName)},</p><p>für Sie wurde ein Zugang zum Familienkonto beim ASC Lajen angelegt.</p><p>Bitte öffnen Sie den Link und legen Sie Ihr Passwort fest:</p><p><a href="${href}">Passwort festlegen und anmelden</a></p><p>${href}</p><p>Der Link gilt 48 Stunden.</p><p>ASC Lajen Raiffeisen</p>`;
+  const html = `<p>Guten Tag ${escapeHtml(safeName)},</p><p>für Sie wurde ein Zugang zum Familienkonto beim ASC Lajen angelegt.</p><p>Bitte kopieren Sie diese Adresse in den Browser und legen Sie Ihr Passwort fest:</p><p>${href}</p><p>Der Link gilt 48 Stunden.</p><p>ASC Lajen Raiffeisen</p>`;
   return sendMail({ to, subject, text, html });
 }
 
