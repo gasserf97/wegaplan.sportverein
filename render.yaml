@@ -32,7 +32,7 @@ services:
       - key: AUTH_SECRET
         generateValue: true
       - key: NEXT_PUBLIC_APP_URL
-        value: https://wegaplan.onrender.com
+        value: https://www.wegaclub.com
       # Vorführung: ohne Stripe-Schlüssel lokaler Test-Checkout (Karte 4242…).
       - key: SHOWCASE_MODE
         value: "1"
@@ -65,10 +65,10 @@ services:
         value: /var/data/uploads
       - key: REGISTRATION_BACKUP_EMAIL
         sync: false
-      # Hauptdomain = Super-Admin. Vereine brauchen eigene Domain + Wildcard-DNS
-      # (slug.wegaplan.onrender.com geht bei Render nicht).
+      # Hauptdomain = Super-Admin unter www.wegaclub.com.
+      # Vereine: slug.wegaclub.com (Wildcard-DNS, nicht *.onrender.com).
       - key: PLATFORM_DOMAIN
-        value: wegaplan.onrender.com
+        value: wegaclub.com
       - key: CLUB_SECRETS_KEY
         sync: false
       - key: PLATFORM_ADMIN_USERNAME

@@ -195,7 +195,11 @@ export function clubPublicUrlLabel(slug: string, requestHost?: string) {
 export async function platformBaseUrl() {
   const domain = platformDomain();
   if (domain && domain !== "0.0.0.0") {
-    return `https://${domain}`;
+    const host =
+      domain === "onrender.com" || domain.endsWith(".onrender.com")
+        ? domain
+        : `www.${domain}`;
+    return `https://${host}`;
   }
   const host = await requestHostHeader().catch(() => "");
   const normalized = normalizeHostHeader(host);

@@ -12,6 +12,15 @@ function isBindOnlyHostname(host: string) {
   return name === "0.0.0.0" || name === "::" || name === "[::]";
 }
 
+function isOnrenderHost(host: string) {
+  return host === "onrender.com" || host.endsWith(".onrender.com");
+}
+
+/** www.wegaclub.com und wegaclub.com sind dieselbe Betreiber-Domain. */
+function bareDomain(host: string) {
+  return host.startsWith("www.") ? host.slice(4) : host;
+}
+
 function hostFromUrl(value: string | undefined) {
   if (!value?.trim()) return "";
   try {
@@ -22,20 +31,31 @@ function hostFromUrl(value: string | undefined) {
 }
 
 /**
- * Hauptdomain des Betreibers. Explizit PLATFORM_DOMAIN, sonst Render-/App-URL
- * (damit wegaplan.onrender.com ohne Extra-Env als Super-Admin funktioniert).
+ * Öffentliche Domain der Vereine, ohne www.
+ * wegaplan.onrender.com ist nur der Server und zählt hier nicht:
+ * sonst wäre www.wegaclub.com kein Betreiber-Host.
  */
 export function platformDomain() {
   const configured = normalizeHostHeader(process.env.PLATFORM_DOMAIN ?? "");
-  if (configured && !isBindOnlyHostname(configured)) {
-    // Falls jemand https://… einträgt
-    return hostFromUrl(configured) || configured;
+  const cleaned =
+    configured && !isBindOnlyHostname(configured)
+      ? bareDomain(hostFromUrl(configured) || configured)
+      : "";
+  if (cleaned && !isOnrenderHost(cleaned)) return cleaned;
+
+  const fromApp = bareDomain(hostFromUrl(process.env.NEXT_PUBLIC_APP_URL));
+  if (fromApp && !isBindOnlyHostname(fromApp) && !isOnrenderHost(fromApp)) return fromApp;
+
+  // Auf Render bleibt die öffentliche Domain wegaclub.com, auch solange
+  // PLATFORM_DOMAIN im Dashboard noch auf dem Service-Host steht.
+  if (process.env.RENDER === "true" || process.env.RENDER_EXTERNAL_HOSTNAME) {
+    return "wegaclub.com";
   }
+
+  if (cleaned) return cleaned;
   const fromRender = hostWithoutPort(process.env.RENDER_EXTERNAL_HOSTNAME ?? "");
   if (fromRender && !isBindOnlyHostname(fromRender)) return fromRender;
-  const fromUrl =
-    hostFromUrl(process.env.NEXT_PUBLIC_APP_URL) ||
-    hostFromUrl(process.env.RENDER_EXTERNAL_URL);
+  const fromUrl = hostFromUrl(process.env.RENDER_EXTERNAL_URL);
   if (fromUrl && !isBindOnlyHostname(fromUrl)) return fromUrl;
   return "";
 }
@@ -114,8 +134,10 @@ export function isPlatformHost(host: string) {
   const name = normalizeHostHeader(host);
   if (name === "localhost" || name === "127.0.0.1") return true;
   const domain = platformDomain();
-  if (!domain) return false;
-  return name === domain || name === `www.${domain}`;
+  if (domain && (name === domain || name === `www.${domain}`)) return true;
+  const renderHost = hostWithoutPort(process.env.RENDER_EXTERNAL_HOSTNAME ?? "");
+  if (renderHost && name === renderHost) return true;
+  return false;
 }
 
 /** Subdomain vor der Plattform-Domain oder `slug.localhost`. */
