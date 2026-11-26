@@ -26,6 +26,14 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return {
+      beforeFiles: [
+        // Browser-Standardpfad → Vereinslogo (Fallback ASC in der Logo-Route).
+        { source: "/favicon.ico", destination: "/api/club/logo" },
+      ],
+    };
+  },
 };
 
 export default nextConfig;

@@ -49,6 +49,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getServerI18n();
   const host = await resolveRequestHost();
   const name = host.kind === "club" ? host.name : "Vereine";
+  const brand = host.kind === "club" ? await getClubBrand() : null;
+  const icon = brand?.logoUrl || "/api/club/logo";
   return {
     title: {
       default: name,
@@ -56,6 +58,11 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     description: t("home.metaDescription"),
     applicationName: name,
+    icons: {
+      icon: [{ url: icon }],
+      shortcut: [{ url: icon }],
+      apple: [{ url: icon }],
+    },
     appleWebApp: {
       capable: true,
       title: name,

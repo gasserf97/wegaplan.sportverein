@@ -30,18 +30,19 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     prefer_related_applications: false,
     icons: [
       {
-        src: "/icon-192.png",
+        src: "/api/club/logo",
         sizes: "192x192",
         type: "image/png",
+        purpose: "any",
       },
       {
-        src: "/icon-512.png",
+        src: "/api/club/logo",
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icon-512.png",
+        src: "/api/club/logo",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",

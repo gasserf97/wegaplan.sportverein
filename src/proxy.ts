@@ -107,6 +107,7 @@ async function withSessionRenewal(request: NextRequest, response: NextResponse) 
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|.*\\..*).*)",
+    "/((?!_next/static|_next/image|sw.js|manifest.webmanifest|.*\\..*).*)",
+    "/favicon.ico",
   ],
 };
