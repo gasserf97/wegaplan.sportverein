@@ -328,6 +328,115 @@ async function accountLink(accountId: string, clubId: string, sectionId: string)
   });
 }
 
+function isUnsupportedConnectConfig(error: unknown) {
+  const message = String(
+    (error as { raw?: { message?: string }; message?: string })?.raw?.message ||
+      (error as { message?: string })?.message ||
+      "",
+  ).toLowerCase();
+  return (
+    message.includes("account configuration is not supported") ||
+    message.includes("not supported for this account") ||
+    message.includes("unsupported combination")
+  );
+}
+
+type ConnectCreateShape = {
+  dashboard: "express" | "full";
+  fees: "stripe" | "application";
+  losses: "stripe" | "application";
+  apiVersion?: string;
+  key: string;
+};
+
+/** Reihenfolge: Gebühren und Verluste bei Stripe, sonst Express-Klassik. */
+const CONNECT_CREATE_SHAPES: ConnectCreateShape[] = [
+  {
+    key: "express-stripe",
+    dashboard: "express",
+    fees: "stripe",
+    losses: "stripe",
+    apiVersion: "2026-11-18.preview",
+  },
+  {
+    key: "full-stripe",
+    dashboard: "full",
+    fees: "stripe",
+    losses: "stripe",
+  },
+  {
+    key: "express-application",
+    dashboard: "express",
+    fees: "application",
+    losses: "application",
+  },
+];
+
+async function createSectionConnectAccount(
+  stripe: ReturnType<typeof getPlatformStripe>,
+  input: {
+    sectionId: string;
+    clubId: string;
+    sectionName: string;
+    displayName: string;
+    email: string;
+  },
+) {
+  const contact =
+    input.email.includes("@") && !input.email.endsWith(".local")
+      ? { contact_email: input.email }
+      : {};
+  let lastError: unknown;
+  for (const shape of CONNECT_CREATE_SHAPES) {
+    try {
+      return await stripe.v2.core.accounts.create(
+        {
+          ...contact,
+          display_name: input.displayName,
+          dashboard: shape.dashboard,
+          identity: {
+            country: "it",
+            entity_type: "company",
+            business_details: { registered_name: input.displayName },
+          },
+          configuration: {
+            merchant: {
+              capabilities: {
+                card_payments: { requested: true },
+              },
+            },
+          },
+          defaults: {
+            currency: "eur",
+            responsibilities: {
+              fees_collector: shape.fees,
+              losses_collector: shape.losses,
+            },
+          },
+          metadata: {
+            clubId: input.clubId,
+            sectionId: input.sectionId,
+            sectionName: input.sectionName,
+            connectShape: shape.key,
+          },
+          include: ["configuration.merchant", "identity", "requirements"],
+        },
+        {
+          idempotencyKey: `connect-section-v4-${shape.key}-${input.sectionId}`,
+          ...(shape.apiVersion ? { apiVersion: shape.apiVersion } : {}),
+        },
+      );
+    } catch (error) {
+      lastError = error;
+      if (!isUnsupportedConnectConfig(error)) throw error;
+      console.warn("Stripe Connect shape rejected", shape.key, safeStripeDetail(error));
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Stripe hat keine passende Konto-Konfiguration akzeptiert.");
+}
+
 export async function beginSectionStripeOnboarding(sectionId: string): Promise<
   | { url: string }
   | { code: "no-platform-key" | "missing" | "missing-iban" | "stripe"; detail?: string }
@@ -353,37 +462,13 @@ export async function beginSectionStripeOnboarding(sectionId: string): Promise<
       );
       const email = admin?.email?.trim().toLowerCase() ?? "";
       const displayName = `${section.club.name} – ${section.name}`;
-      const created = await stripe.v2.core.accounts.create(
-        {
-          ...(email.includes("@") && !email.endsWith(".local")
-            ? { contact_email: email }
-            : {}),
-          display_name: displayName,
-          dashboard: "express",
-          identity: {
-            country: "it",
-            business_details: { registered_name: displayName },
-          },
-          configuration: {
-            merchant: {
-              capabilities: { card_payments: { requested: true } },
-            },
-          },
-          defaults: {
-            currency: "eur",
-            responsibilities: {
-              fees_collector: "stripe",
-              losses_collector: "stripe",
-            },
-          },
-          metadata: {
-            clubId: section.clubId,
-            sectionId: section.id,
-            sectionName: section.name,
-          },
-        },
-        { idempotencyKey: `connect-express-section-v3-${section.id}` },
-      );
+      const created = await createSectionConnectAccount(stripe, {
+        sectionId: section.id,
+        clubId: section.clubId,
+        sectionName: section.name,
+        displayName,
+        email,
+      });
       accountId = created.id;
       await saveConnectAccount(await stripe.accounts.retrieve(accountId));
     }
