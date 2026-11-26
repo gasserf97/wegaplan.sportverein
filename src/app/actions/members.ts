@@ -20,7 +20,7 @@ import {
   usernameCandidateFromEmail,
 } from "@/lib/username";
 import { prisma } from "@/lib/prisma";
-import { listAllStripeSecretKeys } from "@/lib/section-payments";
+import { hasStripeAccess } from "@/lib/stripe";
 import {
   isStripeSubscriptionGone,
   syncStripeRecurringToLocalAutoRenew,
@@ -217,7 +217,7 @@ export async function toggleSectionAdminAction(
 }
 
 async function cancelStripeRecurringForUser(userId: string) {
-  if ((await listAllStripeSecretKeys()).length === 0) return;
+  if (!(await hasStripeAccess())) return;
 
   const subscriptions = await prisma.subscription.findMany({
     where: {

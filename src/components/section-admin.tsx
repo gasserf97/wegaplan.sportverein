@@ -258,51 +258,39 @@ export function SectionMoveButtons({
   );
 }
 
-export function SectionStripeSetupGuide({ webhookUrl }: { webhookUrl: string }) {
+export function SectionStripeSetupGuide({
+  webhookUrl,
+  connect,
+}: {
+  webhookUrl: string;
+  connect: "active" | "pending" | "off";
+}) {
   return (
     <div className="mt-8 rounded-2xl bg-card p-6 ring-1 ring-foreground/10">
-      <h2 className="text-lg font-medium">Stripe: Konto pro Sektion</h2>
+      <h2 className="text-lg font-medium">Stripe: ein Konto pro Verein</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Ideal: jede Sektion hat ein eigenes Stripe-Konto. Fehlen Secret und
-        Webhook bei der Sektion, greift automatisch das Konto des Hauptvereins
-        (<code className="text-xs">STRIPE_*</code> in der Umgebung). Bankdaten
-        ebenso: Sektion zuerst, sonst <code className="text-xs">BANK_*</code>.
+        Kartenzahlungen aller Sektionen laufen über das Stripe-Konto des Vereins.
+        Der Betreiber eröffnet es unter Vereine. Stripe zahlt auf das dort
+        hinterlegte Bankkonto aus. Die IBAN einer Sektion gilt für Überweisungen.
       </p>
-      <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
-        <li>Im jeweiligen Stripe-Dashboard einloggen (Konto der Sektion).</li>
-        <li>
-          Entwickler → API-Schlüssel → Secret Key oder Restricted Key kopieren (
-          <code className="text-xs">sk_live_…</code> /{" "}
-          <code className="text-xs">sk_test_…</code> bzw.{" "}
-          <code className="text-xs">rk_live_…</code> /{" "}
-          <code className="text-xs">rk_test_…</code>
-          ). Restricted Keys brauchen Schreibrechte für Checkout Sessions,
-          Customers, Subscriptions und Payment Intents sowie Leserechte für
-          Payment Methods und Invoices.
-        </li>
-        <li>
-          Entwickler → Webhooks → Endpoint hinzufügen, URL:
-          <br />
-          <code className="mt-1 block break-all rounded-md bg-muted px-2 py-1 text-xs text-foreground">
-            {webhookUrl}
-          </code>
-        </li>
-        <li>
-          Events mindestens:{" "}
-          <code className="text-xs">checkout.session.completed</code>,{" "}
-          <code className="text-xs">checkout.session.expired</code>,{" "}
-          <code className="text-xs">invoice.paid</code>.
-        </li>
-        <li>
-          Signing secret (
-          <code className="text-xs">whsec_…</code>) und Secret Key mit dem
-          beim Betreiber in den Vereinseinstellungen dieser Sektion hinterlegen.
-        </li>
-      </ol>
-      <p className="mt-3 text-xs text-muted-foreground">
-        Publishable Key (<code className="text-xs">pk_…</code>) wird in dieser
-        App nicht benötigt (Hosted Checkout).
-      </p>
+      {connect === "active" ? (
+        <p className="mt-3 text-sm text-emerald-700">
+          Das Vereinskonto ist für Kartenzahlungen freigeschaltet.
+        </p>
+      ) : null}
+      {connect === "pending" ? (
+        <p className="mt-3 text-sm text-amber-700">
+          Das Stripe-Konto ist angelegt. Die Einrichtung bei Stripe ist noch
+          nicht abgeschlossen.
+        </p>
+      ) : null}
+      {connect === "off" ? (
+        <p className="mt-3 text-sm text-muted-foreground">
+          Solange kein Connect-Konto hinterlegt ist, gelten die bisherigen
+          Schlüssel pro Sektion. Webhook dafür:{" "}
+          <code className="break-all text-xs text-foreground">{webhookUrl}</code>
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -360,8 +348,9 @@ export function SectionPaymentsForm({
     >
       <input type="hidden" name="sectionId" value={sectionId} />
       <p className="text-xs text-muted-foreground">
-        IBAN und Stripe-Schlüssel pflegt der Betreiber pro Sektion. Hier bleibt
-        nur der optionale Env-Key als Fallback für ältere Installationen.
+        IBAN und, falls der Verein noch kein Connect-Konto hat, Stripe-Schlüssel
+        pflegt der Betreiber. Hier bleibt nur der optionale Env-Key als Fallback
+        für ältere Installationen.
       </p>
       <div className="grid gap-2 sm:max-w-xs">
         <Label htmlFor={`payment-env-key-${sectionId}`}>Env-Key</Label>

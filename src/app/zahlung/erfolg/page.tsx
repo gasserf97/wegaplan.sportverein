@@ -8,7 +8,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { courseHasCalendarSchedule } from "@/lib/course-schedule";
 import { getServerI18n } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
-import { listAllStripeSecretKeys } from "@/lib/section-payments";
+import { hasStripeAccess } from "@/lib/stripe";
 import { isShowcaseSessionId, loadShowcaseCheckout } from "@/lib/stripe-demo";
 import { isTennisSeasonAddonPlan } from "@/lib/tennis-whatsapp";
 import { tennisWhatsAppInviteDismissed } from "@/lib/tennis-whatsapp-status";
@@ -61,7 +61,7 @@ export default async function PaymentSuccessPage({
       });
       courseIdForOffer = enrollment?.courseId ?? courseIdForOffer;
     }
-  } else if (params.session_id && (await listAllStripeSecretKeys()).length > 0) {
+  } else if (params.session_id && (await hasStripeAccess())) {
     try {
       const result = await fulfillStripeSession(params.session_id);
       title = result?.title ?? null;

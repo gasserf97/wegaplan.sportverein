@@ -1,6 +1,5 @@
 import { stripeFeeSetting } from "@/lib/club-settings";
-import { isStripeConfigured, withStripeAccounts } from "@/lib/stripe";
-import { listAllStripeSecretKeys } from "@/lib/section-payments";
+import { withStripeAccounts } from "@/lib/stripe";
 
 export type StripeFeeConfig = {
   percent: number;
@@ -54,9 +53,8 @@ export function allocateStripeFeeCents(
 }
 
 async function anyStripeConfigured() {
-  if (isStripeConfigured()) return true;
-  const keys = await listAllStripeSecretKeys();
-  return keys.length > 0;
+  const { hasStripeAccess } = await import("@/lib/stripe");
+  return hasStripeAccess();
 }
 
 export async function fetchStripeFeeFromPaymentIntent(

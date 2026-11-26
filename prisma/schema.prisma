@@ -803,6 +803,11 @@ model ClubSettings {
   supportTicketNotifyEmail  String    @default("")
   stripeFeePercent          String    @default("")
   stripeFeeFixedCents       String    @default("")
+  /// Stripe Connect Express-Konto (acct_…). Leer = bisherige Schlüssel pro Sektion.
+  stripeAccountId           String?   @unique
+  stripeChargesEnabled      Boolean   @default(false)
+  stripePayoutsEnabled      Boolean   @default(false)
+  stripeDetailsSubmitted    Boolean   @default(false)
   showcaseMode              Boolean   @default(false)
   impressumUrl              String    @default("")
   /// Hochgeladenes Vereinslogo unter uploads/club. Leer = eingebautes Zeichen.

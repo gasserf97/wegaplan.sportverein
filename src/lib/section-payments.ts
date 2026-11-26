@@ -221,6 +221,26 @@ function globalStripeStatus(): SectionStripeStatus {
 export async function getSectionStripeStatus(
   sectionId: string | null | undefined,
 ): Promise<SectionStripeStatus> {
+  const { sectionCardRail } = await import("@/lib/stripe-connect");
+  const rail = await sectionCardRail(sectionId);
+  if (rail === "connect") {
+    return {
+      secretConfigured: true,
+      webhookConfigured: true,
+      checkoutReady: true,
+      fullyReady: true,
+      usingClubFallback: false,
+    };
+  }
+  if (rail === "pending") {
+    return {
+      secretConfigured: false,
+      webhookConfigured: false,
+      checkoutReady: false,
+      fullyReady: false,
+      usingClubFallback: false,
+    };
+  }
   if (!sectionId) {
     if (!(await legacyPaymentEnv())) {
       return {
@@ -260,6 +280,10 @@ export async function getSectionStripeStatus(
 export async function isSectionStripeConfigured(
   sectionId: string | null | undefined,
 ) {
+  const { sectionCardRail } = await import("@/lib/stripe-connect");
+  const rail = await sectionCardRail(sectionId);
+  if (rail === "connect") return true;
+  if (rail === "pending") return false;
   if (await isStripeDemoMode()) return true;
   if (
     cleanStripeEnv(process.env.SHOWCASE_MODE) === "1" &&

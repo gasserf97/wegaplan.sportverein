@@ -7,11 +7,8 @@ import {
   fetchStripeFeeFromPaymentIntent,
 } from "@/lib/stripe-fees";
 import { chargeSubscriptionRenewal } from "@/lib/stripe-renewal-charge";
-import {
-  isSectionStripeConfigured,
-  listAllStripeSecretKeys,
-} from "@/lib/section-payments";
-import { withStripeAccounts } from "@/lib/stripe";
+import { isSectionStripeConfigured } from "@/lib/section-payments";
+import { hasStripeAccess, withStripeAccounts } from "@/lib/stripe";
 import { getLocale } from "@/lib/i18n/locale";
 import { getTranslator } from "@/lib/i18n/translator";
 import {
@@ -172,7 +169,7 @@ async function resolveStripeCustomerId(subscription: {
   if (subscription.stripeCustomerId) return subscription.stripeCustomerId;
   if (
     !subscription.stripeSessionId ||
-    (await listAllStripeSecretKeys()).length === 0
+    !(await hasStripeAccess())
   ) {
     return null;
   }
@@ -358,7 +355,7 @@ export async function processDueAutoRenewals(now = new Date()) {
 
   let renewed = 0;
   let failed = 0;
-  const anyStripe = (await listAllStripeSecretKeys()).length > 0;
+  const anyStripe = await hasStripeAccess();
 
   for (const subscription of due) {
     const meta = intervalMeta(subscription.plan.interval, t);

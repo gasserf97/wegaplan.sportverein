@@ -166,27 +166,22 @@ export async function refundStripeCheckoutSession(input: {
 }) {
   if (input.amountCents <= 0) return;
 
-  const { listAllStripeSecretKeys, resolveSectionStripeSecretKey } = await import(
-    "@/lib/section-payments"
-  );
+  const { stripeClientsForLookup } = await import("@/lib/stripe-connect");
+  const { resolveSectionStripeSecretKey } = await import("@/lib/section-payments");
+  const clients = await stripeClientsForLookup();
   const sectionKey = input.sectionId
     ? await resolveSectionStripeSecretKey(input.sectionId)
     : null;
-  const keys = [
-    ...new Set(
-      [sectionKey, ...(await listAllStripeSecretKeys())].filter(
-        (key): key is string => Boolean(key),
-      ),
-    ),
-  ];
-  if (keys.length === 0) {
+  if (sectionKey) {
+    clients.unshift(getStripeWithKey(sectionKey));
+  }
+  if (clients.length === 0) {
     throw new Error("Stripe ist nicht konfiguriert.");
   }
 
   let retrieveError: unknown;
   let refundError: unknown;
-  for (const key of keys) {
-    const stripe = getStripeWithKey(key);
+  for (const stripe of clients) {
     let session: Stripe.Checkout.Session;
     try {
       session = await stripe.checkout.sessions.retrieve(input.sessionId, {

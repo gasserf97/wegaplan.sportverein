@@ -69,7 +69,9 @@ Die App läuft unter [http://127.0.0.1:4521](http://127.0.0.1:4521).
 
 ## Zahlungsdaten
 
-Für Kartenzahlungen und Überweisungen in Render → Environment pro Sektion eintragen (ohne Anführungszeichen, danach **Manual Deploy**). Den nicht-geheimen Key wie `TENNIS` unter Admin → Sektionen bei der jeweiligen Sektion speichern:
+Kartenzahlungen laufen über Stripe Connect: ein Express-Konto pro Verein, angelegt unter Betreiber → Verein. Dafür in Render `STRIPE_CONNECT_SECRET_KEY` und `STRIPE_CONNECT_WEBHOOK_SECRET` setzen. Der Webhook `https://<plattform>/api/stripe/webhook` hört auf verbundene Konten (`account.updated`, `checkout.session.completed`, `checkout.session.expired`, `invoice.paid`). Stripe zahlt auf das Bankkonto aus, das der Verein bei der Einrichtung angibt. Die IBAN jeder Sektion bleibt für Überweisungen.
+
+Solange ein Verein kein Connect-Konto hat, gelten weiter die Schlüssel pro Sektion (ohne Anführungszeichen, danach **Manual Deploy**). Den nicht-geheimen Key wie `TENNIS` unter Admin → Sektionen bei der jeweiligen Sektion speichern:
 
 ```
 PAYMENT_TENNIS_STRIPE_SECRET_KEY=sk_test_xxxxxxxx   # Secret (sk_…) oder Restricted Key (rk_…)
@@ -81,7 +83,7 @@ NEXT_PUBLIC_APP_URL=https://app.asclajen.com
 
 Platzhalter wie `sk_test_...` gelten nicht als Schlüssel. Erlaubt: `sk_test_` / `sk_live_` sowie Restricted Keys `rk_test_` / `rk_live_`.
 
-Webhook-Endpunkt: `POST https://app.asclajen.com/api/stripe/webhook` (Events: `checkout.session.completed`, `invoice.paid`). Der Webhook wird erst nach der Zahlung gebraucht, nicht zum Öffnen der Stripe-Seite.
+Der Connect-Webhook liegt auf der Plattform-Domain. Ein Verein ohne Connect-Konto behält seinen bisherigen Endpunkt `POST https://<verein>/api/stripe/webhook`.
 
 ## Technik
 

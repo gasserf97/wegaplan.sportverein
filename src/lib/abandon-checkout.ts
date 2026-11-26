@@ -6,11 +6,10 @@ import {
   cancelledSubscriptionData,
 } from "@/lib/expire-pending";
 import { prisma } from "@/lib/prisma";
-import { listAllStripeSecretKeys } from "@/lib/section-payments";
-import { withStripeAccounts } from "@/lib/stripe";
+import { hasStripeAccess, withStripeAccounts } from "@/lib/stripe";
 
 async function expireStripeSession(sessionId: string) {
-  if ((await listAllStripeSecretKeys()).length === 0) return "abandoned" as const;
+  if (!(await hasStripeAccess())) return "abandoned" as const;
   try {
     return await withStripeAccounts(async (stripe) => {
       const session = await stripe.checkout.sessions.retrieve(sessionId);
@@ -125,7 +124,7 @@ export async function abandonPendingCourtCheckout(
     return { ok: true as const };
   }
 
-  if (reservation.stripeSessionId && (await listAllStripeSecretKeys()).length > 0) {
+  if (reservation.stripeSessionId && await hasStripeAccess()) {
     try {
       const outcome = await expireStripeSession(reservation.stripeSessionId);
       // Bereits bezahlt → aktivieren statt stornieren.
@@ -161,7 +160,7 @@ export async function abandonPendingDeviceCheckout(
     return { ok: true as const };
   }
 
-  if (reservation.stripeSessionId && (await listAllStripeSecretKeys()).length > 0) {
+  if (reservation.stripeSessionId && await hasStripeAccess()) {
     try {
       const outcome = await expireStripeSession(reservation.stripeSessionId);
       if (outcome === "paid") {

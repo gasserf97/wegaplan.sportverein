@@ -360,8 +360,8 @@ export async function importPaidStripeInvoicePayments(scope?: {
   userId?: string;
   subscriptionWhere?: Prisma.SubscriptionWhereInput;
 }) {
-  const { listAllStripeSecretKeys } = await import("@/lib/section-payments");
-  if ((await listAllStripeSecretKeys()).length === 0) return 0;
+  const { hasStripeAccess } = await import("@/lib/stripe");
+  if (!(await hasStripeAccess())) return 0;
 
   const ownerFilter = scope?.userId
     ? { OR: [{ userId: scope.userId }, { purchasedById: scope.userId }] }

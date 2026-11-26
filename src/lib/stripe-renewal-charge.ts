@@ -1,4 +1,9 @@
-import { getStripeForSection } from "@/lib/stripe";
+import {
+  getStripeForSection,
+  isWrongStripeAccountError,
+  withStripeAccounts,
+} from "@/lib/stripe";
+import type Stripe from "stripe";
 
 export type RenewalChargeResult =
   | { ok: true; paymentIntentId: string }
@@ -15,18 +20,16 @@ export async function chargeSubscriptionRenewal(
     return { ok: false, reason: "zero_amount" };
   }
 
-  const stripe = await getStripeForSection(sectionId);
-  const methods = await stripe.paymentMethods.list({
-    customer: stripeCustomerId,
-    type: "card",
-    limit: 1,
-  });
-  const paymentMethod = methods.data[0];
-  if (!paymentMethod) {
-    return { ok: false, reason: "no_payment_method" };
-  }
-
-  try {
+  const chargeOn = async (stripe: Stripe): Promise<RenewalChargeResult> => {
+    const methods = await stripe.paymentMethods.list({
+      customer: stripeCustomerId,
+      type: "card",
+      limit: 1,
+    });
+    const paymentMethod = methods.data[0];
+    if (!paymentMethod) {
+      return { ok: false, reason: "no_payment_method" };
+    }
     const intent = await stripe.paymentIntents.create({
       amount: amountCents,
       currency: "eur",
@@ -36,12 +39,26 @@ export async function chargeSubscriptionRenewal(
       confirm: true,
       description,
     });
-
     if (intent.status !== "succeeded") {
       return { ok: false, reason: `status_${intent.status}` };
     }
-
     return { ok: true, paymentIntentId: intent.id };
+  };
+
+  try {
+    const stripe = await getStripeForSection(sectionId);
+    return await chargeOn(stripe);
+  } catch (error) {
+    if (!isWrongStripeAccountError(error)) {
+      const message =
+        error instanceof Error ? error.message : "Stripe-Abbuchung fehlgeschlagen";
+      console.error("Stripe Verlängerungs-Abbuchung", stripeCustomerId, error);
+      return { ok: false, reason: message };
+    }
+  }
+
+  try {
+    return await withStripeAccounts(chargeOn);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Stripe-Abbuchung fehlgeschlagen";

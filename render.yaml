@@ -38,6 +38,11 @@ services:
         value: "1"
       - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
         sync: false
+      # Plattform-Konto für Stripe Connect. Vereinskonten legt die App an.
+      - key: STRIPE_CONNECT_SECRET_KEY
+        sync: false
+      - key: STRIPE_CONNECT_WEBHOOK_SECRET
+        sync: false
       # Mail/Zahlung/Backup pro Verein in der Super-Admin-UI; Env nur Fallback für Lajen.
       - key: RESEND_API_KEY
         sync: false

@@ -28,6 +28,8 @@ export function isValidStripeSecretKey(key: string) {
 export async function isStripeDemoMode() {
   const { clubShowcaseMode } = await import("@/lib/club-settings");
   const { listAllStripeSecretKeys } = await import("@/lib/section-payments");
+  const { currentClubHasConnectAccount } = await import("@/lib/stripe-connect");
+  if (await currentClubHasConnectAccount()) return false;
   const clubMode = await clubShowcaseMode();
   const keys = await listAllStripeSecretKeys();
   const hasRealKey = keys.some((key) => isValidStripeSecretKey(key));
@@ -66,21 +68,30 @@ export function isStripeConfigured() {
 }
 
 export const stripeCheckoutUnavailableError =
-  "Kartenzahlung ist für diese Sektion nicht eingerichtet. Bitte Überweisung wählen oder den Verein informieren.";
+  "Kartenzahlung ist für diesen Verein noch nicht eingerichtet. Bitte Überweisung wählen oder den Betreiber informieren.";
 
 const cachedByKey = new Map<string, Stripe>();
 
-export function getStripeWithKey(secretKey: string) {
+export function getStripeWithKey(secretKey: string, stripeAccount?: string | null) {
   const key = cleanStripeEnv(secretKey);
+  const account = cleanStripeEnv(stripeAccount);
   if (!key || isPlaceholderStripeKey(key)) {
     throw new Error("Stripe ist nicht konfiguriert.");
   }
-  let client = cachedByKey.get(key);
+  const cacheId = account ? `${key}\n${account}` : key;
+  let client = cachedByKey.get(cacheId);
   if (!client) {
-    client = new Stripe(key);
-    cachedByKey.set(key, client);
+    client = new Stripe(key, account ? { stripeAccount: account } : undefined);
+    cachedByKey.set(cacheId, client);
   }
   return client;
+}
+
+export async function hasStripeAccess() {
+  const { anyConnectAccount } = await import("@/lib/stripe-connect");
+  if (await anyConnectAccount()) return true;
+  const { listAllStripeSecretKeys } = await import("@/lib/section-payments");
+  return (await listAllStripeSecretKeys()).length > 0;
 }
 
 /** Stripe-Client; optional mit explizitem Secret. */
@@ -93,6 +104,19 @@ export function getStripe(secretKey?: string | null) {
 }
 
 export async function getStripeForSection(sectionId: string | null | undefined) {
+  const { connectAccountForSection, getConnectClient, sectionCardRail } = await import(
+    "@/lib/stripe-connect"
+  );
+  const rail = await sectionCardRail(sectionId);
+  if (rail === "connect") {
+    const account = await connectAccountForSection(sectionId);
+    return getConnectClient(account.accountId);
+  }
+  if (rail === "pending") {
+    throw new Error(
+      "Das Stripe-Konto des Vereins ist noch nicht für Kartenzahlungen freigeschaltet.",
+    );
+  }
   const { resolveSectionStripeSecretKey } = await import("@/lib/section-payments");
   let key = await resolveSectionStripeSecretKey(sectionId);
   if (!key && cleanStripeEnv(process.env.SHOWCASE_MODE) === "1") {
@@ -105,22 +129,21 @@ export async function getStripeForSection(sectionId: string | null | undefined) 
 }
 
 /**
- * Session/Customer in einem der bekannten Stripe-Konten laden
- * (aktuell ausschließlich globaler Render-Environment-Key).
+ * Session oder Kunde laden: Connect-Konto des Vereins, danach Legacy-Schlüssel.
  */
 export async function withStripeAccounts<T>(
   run: (stripe: Stripe) => Promise<T>,
 ): Promise<T> {
-  const { listAllStripeSecretKeys } = await import("@/lib/section-payments");
-  const keys = await listAllStripeSecretKeys();
-  if (keys.length === 0) {
+  const { stripeClientsForLookup } = await import("@/lib/stripe-connect");
+  const clients = await stripeClientsForLookup();
+  if (clients.length === 0) {
     throw new Error("Stripe ist nicht konfiguriert.");
   }
 
   let lastError: unknown;
-  for (const key of keys) {
+  for (const client of clients) {
     try {
-      return await run(getStripeWithKey(key));
+      return await run(client);
     } catch (error) {
       lastError = error;
       if (isWrongStripeAccountError(error)) {
