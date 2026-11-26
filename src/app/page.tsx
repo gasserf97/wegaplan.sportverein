@@ -85,7 +85,7 @@ export default async function HomePage() {
               "linear-gradient(135deg, #e40000 0%, #228212 50%, #007c94 100%)",
           }}
         />
-        <div className="relative mx-auto grid w-full max-w-6xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-end lg:py-20">
+        <div className="relative mx-auto grid w-full max-w-6xl gap-8 px-4 pt-8 pb-10 sm:px-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-start lg:gap-10 lg:pt-10 lg:pb-12">
           <div className="space-y-5">
             <p className="text-xs font-semibold tracking-[0.22em] text-primary uppercase">
               {clubName}
@@ -110,7 +110,7 @@ export default async function HomePage() {
           </div>
           <DemoLogins />
         </div>
-        <ol className="relative mx-auto grid w-full max-w-6xl gap-4 px-4 pb-14 sm:grid-cols-3 sm:px-6">
+        <ol className="relative mx-auto grid w-full max-w-6xl gap-4 px-4 pb-10 sm:grid-cols-3 sm:px-6 lg:pb-12">
           {guestSteps.map((item) => (
             <li key={item.step} className="flex gap-4 rounded-xl border border-border bg-white p-4">
               <span className="font-heading text-2xl font-bold text-primary">
