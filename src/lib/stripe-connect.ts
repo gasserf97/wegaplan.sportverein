@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import type Stripe from "stripe";
+import { decryptSecret } from "@/lib/club-secrets";
 import { prisma } from "@/lib/prisma";
 import { cardRail, type CardRail } from "@/lib/stripe-connect-mode";
 import {
@@ -15,6 +16,7 @@ export type ConnectAccountState = {
   chargesEnabled: boolean;
   payoutsEnabled: boolean;
   detailsSubmitted: boolean;
+  payoutLast4: string;
 };
 
 const emptyConnect: ConnectAccountState = {
@@ -22,7 +24,16 @@ const emptyConnect: ConnectAccountState = {
   chargesEnabled: false,
   payoutsEnabled: false,
   detailsSubmitted: false,
+  payoutLast4: "",
 };
+
+const connectSelect = {
+  stripeAccountId: true,
+  stripeChargesEnabled: true,
+  stripePayoutsEnabled: true,
+  stripeDetailsSubmitted: true,
+  stripePayoutLast4: true,
+} as const;
 
 export function platformStripeSecret() {
   const key = cleanStripeEnv(process.env.STRIPE_CONNECT_SECRET_KEY);
@@ -50,66 +61,61 @@ export function getConnectClient(accountId: string) {
   return getStripeWithKey(key, accountId);
 }
 
-function stateFromSettings(settings: {
+function stateFromConfig(config: {
   stripeAccountId: string | null;
   stripeChargesEnabled: boolean;
   stripePayoutsEnabled: boolean;
   stripeDetailsSubmitted: boolean;
+  stripePayoutLast4: string;
 } | null): ConnectAccountState {
-  if (!settings?.stripeAccountId) return emptyConnect;
+  if (!config?.stripeAccountId) return emptyConnect;
   return {
-    accountId: settings.stripeAccountId,
-    chargesEnabled: settings.stripeChargesEnabled,
-    payoutsEnabled: settings.stripePayoutsEnabled,
-    detailsSubmitted: settings.stripeDetailsSubmitted,
+    accountId: config.stripeAccountId,
+    chargesEnabled: config.stripeChargesEnabled,
+    payoutsEnabled: config.stripePayoutsEnabled,
+    detailsSubmitted: config.stripeDetailsSubmitted,
+    payoutLast4: config.stripePayoutLast4,
   };
-}
-
-async function clubIdForSection(sectionId: string | null | undefined) {
-  if (sectionId) {
-    const section = await prisma.section.findUnique({
-      where: { id: sectionId },
-      select: { clubId: true },
-    });
-    if (section?.clubId) return section.clubId;
-  }
-  return currentClubId();
-}
-
-export async function connectAccountForClub(clubId: string) {
-  const settings = await prisma.clubSettings.findUnique({
-    where: { clubId },
-    select: {
-      stripeAccountId: true,
-      stripeChargesEnabled: true,
-      stripePayoutsEnabled: true,
-      stripeDetailsSubmitted: true,
-    },
-  });
-  return stateFromSettings(settings);
 }
 
 export async function connectAccountForSection(
   sectionId: string | null | undefined,
 ) {
-  const clubId = await clubIdForSection(sectionId);
-  if (!clubId) return emptyConnect;
-  return connectAccountForClub(clubId);
+  if (!sectionId) return emptyConnect;
+  const config = await prisma.sectionPaymentConfig.findUnique({
+    where: { sectionId },
+    select: connectSelect,
+  });
+  return stateFromConfig(config);
+}
+
+async function sectionIdsForLookup() {
+  const clubId = await currentClubId();
+  const sections = await prisma.section.findMany({
+    where: clubId ? { clubId } : undefined,
+    select: { id: true },
+  });
+  return sections.map((section) => section.id);
 }
 
 export async function currentClubHasConnectAccount() {
   const clubId = await currentClubId();
   if (!clubId) return false;
-  const state = await connectAccountForClub(clubId);
-  return Boolean(state.accountId);
+  const ids = await sectionIdsForLookup();
+  if (ids.length === 0) return false;
+  const row = await prisma.sectionPaymentConfig.findFirst({
+    where: { sectionId: { in: ids }, stripeAccountId: { not: null } },
+    select: { sectionId: true },
+  });
+  return Boolean(row);
 }
 
 export async function anyConnectAccount() {
   const clubId = await currentClubId();
   if (clubId) return currentClubHasConnectAccount();
-  const row = await prisma.clubSettings.findFirst({
+  const row = await prisma.sectionPaymentConfig.findFirst({
     where: { stripeAccountId: { not: null } },
-    select: { clubId: true },
+    select: { sectionId: true },
   });
   return Boolean(row);
 }
@@ -134,26 +140,22 @@ export async function sectionCardRail(
   });
 }
 
-/** Clients für Nachschlagen: Connect-Konto des Vereins, danach Legacy-Schlüssel. */
+/** Clients für Nachschlagen: Connect-Konten der Sektionen, danach Legacy-Schlüssel. */
 export async function stripeClientsForLookup(): Promise<Stripe[]> {
   const clients: Stripe[] = [];
   const seenAccounts = new Set<string>();
-  const pushAccount = (accountId: string | null | undefined) => {
-    const id = accountId?.trim() ?? "";
-    if (!id || seenAccounts.has(id) || !platformStripeSecret()) return;
-    seenAccounts.add(id);
-    clients.push(getConnectClient(id));
-  };
-
-  const clubId = await currentClubId();
-  if (clubId) {
-    pushAccount((await connectAccountForClub(clubId)).accountId);
-  } else {
-    const rows = await prisma.clubSettings.findMany({
-      where: { stripeAccountId: { not: null } },
+  const ids = await sectionIdsForLookup();
+  if (platformStripeSecret() && ids.length > 0) {
+    const rows = await prisma.sectionPaymentConfig.findMany({
+      where: { sectionId: { in: ids }, stripeAccountId: { not: null } },
       select: { stripeAccountId: true },
     });
-    for (const row of rows) pushAccount(row.stripeAccountId);
+    for (const row of rows) {
+      const id = row.stripeAccountId?.trim() ?? "";
+      if (!id || seenAccounts.has(id)) continue;
+      seenAccounts.add(id);
+      clients.push(getConnectClient(id));
+    }
   }
 
   const { listAllStripeSecretKeys } = await import("@/lib/section-payments");
@@ -163,22 +165,33 @@ export async function stripeClientsForLookup(): Promise<Stripe[]> {
   return clients;
 }
 
-export async function saveConnectAccount(account: Stripe.Account) {
-  const fromMeta = account.metadata?.clubId?.trim() ?? "";
-  const existing = await prisma.clubSettings.findFirst({
+async function sectionIdForAccount(account: Stripe.Account) {
+  const fromMeta = account.metadata?.sectionId?.trim() ?? "";
+  const existing = await prisma.sectionPaymentConfig.findFirst({
     where: { stripeAccountId: account.id },
-    select: { clubId: true },
+    select: { sectionId: true },
   });
-  const clubId = existing?.clubId || fromMeta;
-  if (!clubId) return null;
-  const settings = await prisma.clubSettings.findUnique({
-    where: { clubId },
-    select: { clubId: true },
+  return existing?.sectionId || fromMeta;
+}
+
+export async function saveConnectAccount(account: Stripe.Account) {
+  const sectionId = await sectionIdForAccount(account);
+  if (!sectionId) return null;
+  const section = await prisma.section.findUnique({
+    where: { id: sectionId },
+    select: { id: true },
   });
-  if (!settings) return null;
-  return prisma.clubSettings.update({
-    where: { clubId },
-    data: {
+  if (!section) return null;
+  return prisma.sectionPaymentConfig.upsert({
+    where: { sectionId },
+    create: {
+      sectionId,
+      stripeAccountId: account.id,
+      stripeChargesEnabled: Boolean(account.charges_enabled),
+      stripePayoutsEnabled: Boolean(account.payouts_enabled),
+      stripeDetailsSubmitted: Boolean(account.details_submitted),
+    },
+    update: {
       stripeAccountId: account.id,
       stripeChargesEnabled: Boolean(account.charges_enabled),
       stripePayoutsEnabled: Boolean(account.payouts_enabled),
@@ -187,12 +200,89 @@ export async function saveConnectAccount(account: Stripe.Account) {
   });
 }
 
-export async function refreshClubConnectStatus(clubId: string) {
-  const state = await connectAccountForClub(clubId);
+function sectionBank(config: {
+  bankAccountHolder: string;
+  bankIban: string;
+} | null) {
+  const holder = config?.bankAccountHolder.trim() ?? "";
+  const iban = decryptSecret(config?.bankIban ?? "").replace(/\s/g, "").toUpperCase();
+  if (iban.length < 15 || !holder) return null;
+  return { holder, iban, last4: iban.slice(-4) };
+}
+
+/** Hängt die IBAN der Sektion als Auszahlungskonto an ihr Stripe-Konto. */
+export async function syncSectionPayoutBank(sectionId: string) {
+  const config = await prisma.sectionPaymentConfig.findUnique({
+    where: { sectionId },
+  });
+  const accountId = config?.stripeAccountId ?? "";
+  const bank = sectionBank(config);
+  if (!accountId || !bank || !platformStripeSecret()) return "";
+  const stripe = getPlatformStripe();
+  try {
+    const existing = await stripe.accounts.listExternalAccounts(accountId, {
+      object: "bank_account",
+      limit: 10,
+    });
+    const found = existing.data.find(
+      (item) => "last4" in item && item.last4 === bank.last4,
+    );
+    if (found && "id" in found) {
+      if ("default_for_currency" in found && !found.default_for_currency) {
+        await stripe.accounts.updateExternalAccount(accountId, found.id, {
+          default_for_currency: true,
+        });
+      }
+      await prisma.sectionPaymentConfig.update({
+        where: { sectionId },
+        data: { stripePayoutLast4: bank.last4 },
+      });
+      return bank.last4;
+    }
+    try {
+      await stripe.accounts.createExternalAccount(accountId, {
+        external_account: {
+          object: "bank_account",
+          country: bank.iban.slice(0, 2),
+          currency: "eur",
+          account_number: bank.iban,
+          account_holder_name: bank.holder,
+          account_holder_type: "company",
+        },
+        default_for_currency: true,
+      });
+      await prisma.sectionPaymentConfig.update({
+        where: { sectionId },
+        data: { stripePayoutLast4: bank.last4 },
+      });
+      return bank.last4;
+    } catch (error) {
+      const current = existing.data.find(
+        (item) => "last4" in item && "default_for_currency" in item && item.default_for_currency,
+      ) ?? existing.data.find((item) => "last4" in item);
+      const last4 = current && "last4" in current ? current.last4 ?? "" : "";
+      if (last4) {
+        await prisma.sectionPaymentConfig.update({
+          where: { sectionId },
+          data: { stripePayoutLast4: last4 },
+        });
+      }
+      console.error("Stripe Auszahlungskonto", sectionId, error);
+      return last4;
+    }
+  } catch (error) {
+    console.error("Stripe Auszahlungskonto", sectionId, error);
+    return config?.stripePayoutLast4 ?? "";
+  }
+}
+
+export async function refreshSectionConnectStatus(sectionId: string) {
+  const state = await connectAccountForSection(sectionId);
   if (!state.accountId || !platformStripeSecret()) return state;
   const account = await getPlatformStripe().accounts.retrieve(state.accountId);
   await saveConnectAccount(account);
-  return connectAccountForClub(clubId);
+  await syncSectionPayoutBank(sectionId);
+  return connectAccountForSection(sectionId);
 }
 
 /** Origin des Betreibers. Lokal bleibt der Port erhalten (127.0.0.1:4521). */
@@ -223,32 +313,33 @@ function safeStripeDetail(error: unknown) {
     .slice(0, 180);
 }
 
-async function accountLink(accountId: string, clubId: string) {
+async function accountLink(accountId: string, clubId: string, sectionId: string) {
   const base = await operatorOrigin();
   return getPlatformStripe().accountLinks.create({
     account: accountId,
-    refresh_url: `${base}/vereine/${clubId}/stripe/erneuern`,
-    return_url: `${base}/vereine/${clubId}/stripe/zurueck`,
+    refresh_url: `${base}/vereine/${clubId}/stripe/${sectionId}/erneuern`,
+    return_url: `${base}/vereine/${clubId}/stripe/${sectionId}/zurueck`,
     type: "account_onboarding",
   });
 }
 
-export async function beginClubStripeOnboarding(clubId: string): Promise<
+export async function beginSectionStripeOnboarding(sectionId: string): Promise<
   | { url: string }
-  | { code: "no-platform-key" | "missing" | "stripe"; detail?: string }
+  | { code: "no-platform-key" | "missing" | "missing-iban" | "stripe"; detail?: string }
 > {
   if (!platformStripeSecret()) return { code: "no-platform-key" };
-  const club = await prisma.club.findUnique({
-    where: { id: clubId },
-    include: { settings: true },
+  const section = await prisma.section.findUnique({
+    where: { id: sectionId },
+    include: { club: true, paymentConfig: true },
   });
-  if (!club?.settings) return { code: "missing" };
+  if (!section) return { code: "missing" };
+  if (!sectionBank(section.paymentConfig)) return { code: "missing-iban" };
 
   const stripe = getPlatformStripe();
   try {
-    let accountId = club.settings.stripeAccountId;
+    let accountId = section.paymentConfig?.stripeAccountId ?? null;
     if (!accountId) {
-      const admin = await runWithClub(club.id, () =>
+      const admin = await runWithClub(section.clubId, () =>
         prisma.user.findFirst({
           where: { role: "ADMIN", canLogin: true },
           orderBy: { createdAt: "asc" },
@@ -270,43 +361,52 @@ export async function beginClubStripeOnboarding(clubId: string): Promise<
             losses: { payments: "application" },
             requirement_collection: "stripe",
           },
-          business_profile: { name: club.name },
-          metadata: { clubId: club.id },
+          business_profile: { name: `${section.club.name} – ${section.name}` },
+          metadata: {
+            clubId: section.clubId,
+            sectionId: section.id,
+            sectionName: section.name,
+          },
         },
-        { idempotencyKey: `connect-express-${club.id}` },
+        { idempotencyKey: `connect-express-section-${section.id}` },
       );
       accountId = account.id;
       await saveConnectAccount(account);
     }
 
-    if (club.settings.stripeChargesEnabled && club.settings.stripeDetailsSubmitted) {
+    await syncSectionPayoutBank(section.id);
+
+    const ready =
+      Boolean(section.paymentConfig?.stripeChargesEnabled) &&
+      Boolean(section.paymentConfig?.stripeDetailsSubmitted);
+    if (ready) {
       try {
         const login = await stripe.accounts.createLoginLink(accountId);
         return { url: login.url };
       } catch (error) {
-        console.error("Stripe Express Login", clubId, error);
+        console.error("Stripe Express Login", sectionId, error);
       }
     }
-    const link = await accountLink(accountId, club.id);
+    const link = await accountLink(accountId, section.clubId, section.id);
     return { url: link.url };
   } catch (error) {
-    console.error("Stripe Connect Onboarding", clubId, error);
+    console.error("Stripe Connect Onboarding", sectionId, error);
     return { code: "stripe", detail: safeStripeDetail(error) };
   }
 }
 
-export async function clubStripeDashboardLink(clubId: string): Promise<
+export async function sectionStripeDashboardLink(sectionId: string): Promise<
   | { url: string }
-  | { code: "no-platform-key" | "missing" | "stripe"; detail?: string }
+  | { code: "no-platform-key" | "missing" | "missing-iban" | "stripe"; detail?: string }
 > {
   if (!platformStripeSecret()) return { code: "no-platform-key" };
-  const state = await connectAccountForClub(clubId);
+  const state = await connectAccountForSection(sectionId);
   if (!state.accountId) return { code: "missing" };
   try {
     const login = await getPlatformStripe().accounts.createLoginLink(state.accountId);
     return { url: login.url };
   } catch (error) {
-    console.error("Stripe Express Dashboard", clubId, error);
-    return beginClubStripeOnboarding(clubId);
+    console.error("Stripe Express Dashboard", sectionId, error);
+    return beginSectionStripeOnboarding(sectionId);
   }
 }

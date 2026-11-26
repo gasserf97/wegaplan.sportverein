@@ -19,7 +19,6 @@ import {
   resolveSectionBank,
   stripeWebhookEndpointUrl,
 } from "@/lib/section-payments";
-import { connectAccountForSection } from "@/lib/stripe-connect";
 import { sectionListOrderBy } from "@/lib/section-order";
 import { prisma } from "@/lib/prisma";
 
@@ -37,12 +36,6 @@ export default async function SectionsAdminPage() {
   });
 
   const webhookUrl = await stripeWebhookEndpointUrl();
-  const connect = await connectAccountForSection(null);
-  const connectMode = connect.chargesEnabled
-    ? "active"
-    : connect.accountId
-      ? "pending"
-      : "off";
   const paymentStatuses = await Promise.all(sections.map(async (section) => ({
     section,
     bankConfigured: Boolean(await resolveSectionBank(section.id)),
@@ -76,12 +69,12 @@ export default async function SectionsAdminPage() {
         </Link>
       </div>
 
-      {connectMode === "off" && incompleteStripe.length > 0 ? (
+      {incompleteStripe.length > 0 ? (
         <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           Stripe ist unvollständig bei:{" "}
           {incompleteStripe.map((item) => item.section.name).join(", ")}.
-          Der Betreiber verbindet den Verein mit Stripe oder trägt die bisherigen
-          Schlüssel ein.
+          Der Betreiber eröffnet unter Vereine ein eigenes Stripe-Konto für jede
+          dieser Sektionen.
         </p>
       ) : null}
       {incompleteBank.length > 0 ? (
@@ -96,7 +89,7 @@ export default async function SectionsAdminPage() {
         <SectionCreateForm />
       </div>
 
-      <SectionStripeSetupGuide webhookUrl={webhookUrl} connect={connectMode} />
+      <SectionStripeSetupGuide webhookUrl={webhookUrl} />
 
       <h2 className="mt-10 text-2xl">Bestehende Sektionen</h2>
       <p className="mt-1 text-sm text-muted-foreground">
@@ -137,15 +130,11 @@ export default async function SectionsAdminPage() {
                       Überweisung:{" "}
                       {bankConfigured ? "hinterlegt" : "fehlt"}{" "}
                       · Stripe:{" "}
-                      {connectMode === "active"
-                        ? "Vereinskonto"
-                        : connectMode === "pending"
-                          ? "Einrichtung offen"
-                          : stripeStatus.fullyReady
-                            ? "hinterlegt"
-                            : stripeStatus.secretConfigured
-                              ? "unvollständig (Webhook fehlt)"
-                              : "fehlt"}
+                      {stripeStatus.fullyReady
+                        ? "eigenes Konto"
+                        : stripeStatus.secretConfigured
+                          ? "unvollständig (Webhook fehlt)"
+                          : "fehlt"}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-start gap-2">

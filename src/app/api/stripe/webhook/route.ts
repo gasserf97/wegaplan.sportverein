@@ -34,11 +34,11 @@ async function verifyLegacyEvent(body: string, signature: string) {
 
 async function clubIdForEvent(event: Stripe.Event) {
   if (event.account) {
-    const row = await prisma.clubSettings.findFirst({
+    const row = await prisma.sectionPaymentConfig.findFirst({
       where: { stripeAccountId: event.account },
-      select: { clubId: true },
+      select: { section: { select: { clubId: true } } },
     });
-    if (row?.clubId) return row.clubId;
+    if (row?.section.clubId) return row.section.clubId;
   }
   return currentClubId();
 }

@@ -258,39 +258,20 @@ export function SectionMoveButtons({
   );
 }
 
-export function SectionStripeSetupGuide({
-  webhookUrl,
-  connect,
-}: {
-  webhookUrl: string;
-  connect: "active" | "pending" | "off";
-}) {
+export function SectionStripeSetupGuide({ webhookUrl }: { webhookUrl: string }) {
   return (
     <div className="mt-8 rounded-2xl bg-card p-6 ring-1 ring-foreground/10">
-      <h2 className="text-lg font-medium">Stripe: ein Konto pro Verein</h2>
+      <h2 className="text-lg font-medium">Stripe: ein Konto pro Sektion</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Kartenzahlungen aller Sektionen laufen über das Stripe-Konto des Vereins.
-        Der Betreiber eröffnet es unter Vereine. Stripe zahlt auf das dort
-        hinterlegte Bankkonto aus. Die IBAN einer Sektion gilt für Überweisungen.
+        Kartenzahlungen einer Sektion gehen auf ihr eigenes Stripe-Konto und von
+        dort auf ihre IBAN. Es gibt kein gemeinsames Konto für mehrere Sektionen.
+        Der Betreiber eröffnet das Konto unter Vereine, bei der jeweiligen Sektion.
       </p>
-      {connect === "active" ? (
-        <p className="mt-3 text-sm text-emerald-700">
-          Das Vereinskonto ist für Kartenzahlungen freigeschaltet.
-        </p>
-      ) : null}
-      {connect === "pending" ? (
-        <p className="mt-3 text-sm text-amber-700">
-          Das Stripe-Konto ist angelegt. Die Einrichtung bei Stripe ist noch
-          nicht abgeschlossen.
-        </p>
-      ) : null}
-      {connect === "off" ? (
-        <p className="mt-3 text-sm text-muted-foreground">
-          Solange kein Connect-Konto hinterlegt ist, gelten die bisherigen
-          Schlüssel pro Sektion. Webhook dafür:{" "}
-          <code className="break-all text-xs text-foreground">{webhookUrl}</code>
-        </p>
-      ) : null}
+      <p className="mt-3 text-sm text-muted-foreground">
+        Solange eine Sektion kein Connect-Konto hat, gilt ihr bisheriger Schlüssel.
+        Webhook dafür:{" "}
+        <code className="break-all text-xs text-foreground">{webhookUrl}</code>
+      </p>
     </div>
   );
 }
@@ -348,9 +329,9 @@ export function SectionPaymentsForm({
     >
       <input type="hidden" name="sectionId" value={sectionId} />
       <p className="text-xs text-muted-foreground">
-        IBAN und, falls der Verein noch kein Connect-Konto hat, Stripe-Schlüssel
-        pflegt der Betreiber. Hier bleibt nur der optionale Env-Key als Fallback
-        für ältere Installationen.
+        Jede Sektion hat ihr eigenes Stripe-Konto und ihre eigene IBAN. Der
+        Betreiber pflegt beides. Hier bleibt nur der optionale Env-Key als
+        Fallback für ältere Installationen.
       </p>
       <div className="grid gap-2 sm:max-w-xs">
         <Label htmlFor={`payment-env-key-${sectionId}`}>Env-Key</Label>

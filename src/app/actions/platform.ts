@@ -385,42 +385,67 @@ export async function saveSectionPaymentAction(
       ),
     },
   });
-  redirect(`/vereine/${section.clubId}`);
+  const { syncSectionPayoutBank } = await import("@/lib/stripe-connect");
+  await syncSectionPayoutBank(sectionId).catch((error) => {
+    console.error("Stripe Auszahlungskonto", sectionId, error);
+  });
+  redirect(`/vereine/${section.clubId}#section-${sectionId}`);
 }
 
-function stripeReturnPath(clubId: string, code: string, detail?: string) {
-  const params = new URLSearchParams({ stripe: code });
+function stripeReturnPath(
+  clubId: string,
+  sectionId: string,
+  code: string,
+  detail?: string,
+) {
+  const params = new URLSearchParams({ stripe: code, section: sectionId });
   if (detail) params.set("m", detail);
-  return `/vereine/${clubId}?${params.toString()}`;
+  return `/vereine/${clubId}?${params.toString()}#section-${sectionId}`;
 }
 
-export async function openClubStripeOnboardingAction(clubId: string) {
+async function sectionClubId(sectionId: string) {
+  const section = await prisma.section.findUnique({
+    where: { id: sectionId },
+    select: { clubId: true },
+  });
+  return section?.clubId ?? null;
+}
+
+export async function openSectionStripeOnboardingAction(sectionId: string) {
   const actor = await requirePlatform();
   if (!actor) redirect("/vereine");
-  const { beginClubStripeOnboarding } = await import("@/lib/stripe-connect");
-  const result = await beginClubStripeOnboarding(clubId);
+  const clubId = await sectionClubId(sectionId);
+  if (!clubId) redirect("/vereine");
+  const { beginSectionStripeOnboarding } = await import("@/lib/stripe-connect");
+  const result = await beginSectionStripeOnboarding(sectionId);
   if ("url" in result) redirect(result.url);
-  redirect(stripeReturnPath(clubId, result.code, result.detail));
+  redirect(stripeReturnPath(clubId, sectionId, result.code, result.detail));
 }
 
-export async function openClubStripeDashboardAction(clubId: string) {
+export async function openSectionStripeDashboardAction(sectionId: string) {
   const actor = await requirePlatform();
   if (!actor) redirect("/vereine");
-  const { clubStripeDashboardLink } = await import("@/lib/stripe-connect");
-  const result = await clubStripeDashboardLink(clubId);
+  const clubId = await sectionClubId(sectionId);
+  if (!clubId) redirect("/vereine");
+  const { sectionStripeDashboardLink } = await import("@/lib/stripe-connect");
+  const result = await sectionStripeDashboardLink(sectionId);
   if ("url" in result) redirect(result.url);
-  redirect(stripeReturnPath(clubId, result.code, result.detail));
+  redirect(stripeReturnPath(clubId, sectionId, result.code, result.detail));
 }
 
-export async function refreshClubStripeStatusAction(clubId: string) {
+export async function refreshSectionStripeStatusAction(sectionId: string) {
   const actor = await requirePlatform();
   if (!actor) redirect("/vereine");
-  const { refreshClubConnectStatus } = await import("@/lib/stripe-connect");
+  const clubId = await sectionClubId(sectionId);
+  if (!clubId) redirect("/vereine");
+  const { refreshSectionConnectStatus } = await import("@/lib/stripe-connect");
   try {
-    await refreshClubConnectStatus(clubId);
+    await refreshSectionConnectStatus(sectionId);
   } catch (error) {
-    console.error("Stripe Connect Status", clubId, error);
-    redirect(stripeReturnPath(clubId, "stripe", "Status konnte nicht geladen werden."));
+    console.error("Stripe Connect Status", sectionId, error);
+    redirect(
+      stripeReturnPath(clubId, sectionId, "stripe", "Status konnte nicht geladen werden."),
+    );
   }
-  redirect(`/vereine/${clubId}?stripe=zurueck`);
+  redirect(stripeReturnPath(clubId, sectionId, "zurueck"));
 }

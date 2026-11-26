@@ -68,7 +68,7 @@ export function isStripeConfigured() {
 }
 
 export const stripeCheckoutUnavailableError =
-  "Kartenzahlung ist für diesen Verein noch nicht eingerichtet. Bitte Überweisung wählen oder den Betreiber informieren.";
+  "Kartenzahlung ist für diese Sektion noch nicht eingerichtet. Bitte Überweisung wählen oder den Betreiber informieren.";
 
 const cachedByKey = new Map<string, Stripe>();
 
@@ -114,7 +114,7 @@ export async function getStripeForSection(sectionId: string | null | undefined) 
   }
   if (rail === "pending") {
     throw new Error(
-      "Das Stripe-Konto des Vereins ist noch nicht für Kartenzahlungen freigeschaltet.",
+      "Das Stripe-Konto dieser Sektion ist noch nicht für Kartenzahlungen freigeschaltet.",
     );
   }
   const { resolveSectionStripeSecretKey } = await import("@/lib/section-payments");
@@ -129,7 +129,7 @@ export async function getStripeForSection(sectionId: string | null | undefined) 
 }
 
 /**
- * Session oder Kunde laden: Connect-Konto des Vereins, danach Legacy-Schlüssel.
+ * Session oder Kunde laden: Connect-Konten der Sektionen, danach Legacy-Schlüssel.
  */
 export async function withStripeAccounts<T>(
   run: (stripe: Stripe) => Promise<T>,
