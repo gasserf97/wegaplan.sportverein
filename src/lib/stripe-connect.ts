@@ -310,16 +310,21 @@ function safeStripeDetail(error: unknown) {
     .replace(/\b(sk|rk|pk)_(test|live)_[A-Za-z0-9]+/g, "Stripe-Schlüssel")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 180);
+    .slice(0, 400);
 }
 
 async function accountLink(accountId: string, clubId: string, sectionId: string) {
   const base = await operatorOrigin();
-  return getPlatformStripe().accountLinks.create({
+  return getPlatformStripe().v2.core.accountLinks.create({
     account: accountId,
-    refresh_url: `${base}/vereine/${clubId}/stripe/${sectionId}/erneuern`,
-    return_url: `${base}/vereine/${clubId}/stripe/${sectionId}/zurueck`,
-    type: "account_onboarding",
+    use_case: {
+      type: "account_onboarding",
+      account_onboarding: {
+        configurations: ["merchant"],
+        refresh_url: `${base}/vereine/${clubId}/stripe/${sectionId}/erneuern`,
+        return_url: `${base}/vereine/${clubId}/stripe/${sectionId}/zurueck`,
+      },
+    },
   });
 }
 
@@ -347,31 +352,40 @@ export async function beginSectionStripeOnboarding(sectionId: string): Promise<
         }),
       );
       const email = admin?.email?.trim().toLowerCase() ?? "";
-      const account = await stripe.accounts.create(
+      const displayName = `${section.club.name} – ${section.name}`;
+      const created = await stripe.v2.core.accounts.create(
         {
-          country: "IT",
-          ...(email.includes("@") && !email.endsWith(".local") ? { email } : {}),
-          capabilities: {
-            card_payments: { requested: true },
-            transfers: { requested: true },
+          ...(email.includes("@") && !email.endsWith(".local")
+            ? { contact_email: email }
+            : {}),
+          display_name: displayName,
+          dashboard: "express",
+          identity: {
+            country: "it",
+            business_details: { registered_name: displayName },
           },
-          controller: {
-            stripe_dashboard: { type: "express" },
-            fees: { payer: "account" },
-            losses: { payments: "stripe" },
-            requirement_collection: "stripe",
+          configuration: {
+            merchant: {
+              capabilities: { card_payments: { requested: true } },
+            },
           },
-          business_profile: { name: `${section.club.name} – ${section.name}` },
+          defaults: {
+            currency: "eur",
+            responsibilities: {
+              fees_collector: "stripe",
+              losses_collector: "stripe",
+            },
+          },
           metadata: {
             clubId: section.clubId,
             sectionId: section.id,
             sectionName: section.name,
           },
         },
-        { idempotencyKey: `connect-express-section-v2-${section.id}` },
+        { idempotencyKey: `connect-express-section-v3-${section.id}` },
       );
-      accountId = account.id;
-      await saveConnectAccount(account);
+      accountId = created.id;
+      await saveConnectAccount(await stripe.accounts.retrieve(accountId));
     }
 
     await syncSectionPayoutBank(section.id);
