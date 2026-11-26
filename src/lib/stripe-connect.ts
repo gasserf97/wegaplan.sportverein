@@ -358,7 +358,7 @@ export async function beginSectionStripeOnboarding(sectionId: string): Promise<
           controller: {
             stripe_dashboard: { type: "express" },
             fees: { payer: "account" },
-            losses: { payments: "application" },
+            losses: { payments: "stripe" },
             requirement_collection: "stripe",
           },
           business_profile: { name: `${section.club.name} – ${section.name}` },
@@ -368,7 +368,7 @@ export async function beginSectionStripeOnboarding(sectionId: string): Promise<
             sectionName: section.name,
           },
         },
-        { idempotencyKey: `connect-express-section-${section.id}` },
+        { idempotencyKey: `connect-express-section-v2-${section.id}` },
       );
       accountId = account.id;
       await saveConnectAccount(account);

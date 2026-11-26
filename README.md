@@ -69,7 +69,7 @@ Die App läuft unter [http://127.0.0.1:4521](http://127.0.0.1:4521).
 
 ## Zahlungsdaten
 
-Kartenzahlungen laufen über Stripe Connect: ein Express-Konto pro Sektion, angelegt unter Betreiber → Verein bei der jeweiligen Sektion. Die Auszahlung geht auf die IBAN dieser Sektion. Dafür in Render `STRIPE_CONNECT_SECRET_KEY` und `STRIPE_CONNECT_WEBHOOK_SECRET` setzen. Der Webhook `https://<plattform>/api/stripe/webhook` hört auf verbundene Konten (`account.updated`, `checkout.session.completed`, `checkout.session.expired`, `invoice.paid`).
+Kartenzahlungen laufen über Stripe Connect: ein Express-Konto pro Sektion, angelegt unter Betreiber → Verein bei der jeweiligen Sektion. Die Auszahlung geht auf die IBAN dieser Sektion. Reicht das Guthaben dieses Kontos für eine Erstattung nicht, schlägt die Kartenerstattung fehl und der Betrag erscheint unter den Rücküberweisungen. Dafür in Render `STRIPE_CONNECT_SECRET_KEY` und `STRIPE_CONNECT_WEBHOOK_SECRET` setzen. Der Webhook `https://<plattform>/api/stripe/webhook` hört auf verbundene Konten (`account.updated`, `checkout.session.completed`, `checkout.session.expired`, `invoice.paid`).
 
 Solange eine Sektion kein Connect-Konto hat, gilt weiter ihr eigener Schlüssel (ohne Anführungszeichen, danach **Manual Deploy**). Den nicht-geheimen Key wie `TENNIS` unter Admin → Sektionen speichern:
 

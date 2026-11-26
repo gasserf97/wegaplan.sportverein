@@ -7,6 +7,25 @@ import {
 /** Unter diesem Betrag lehnt Stripe eine EUR-Teilrückerstattung ab. */
 export const STRIPE_EUR_MIN_REFUND_CENTS = 50;
 
+export function eurBalanceCents(
+  rows: { amount: number; currency: string }[] | null | undefined,
+) {
+  return (rows ?? [])
+    .filter((row) => row.currency === "eur")
+    .reduce((sum, row) => sum + row.amount, 0);
+}
+
+/** true, wenn verfügbares und ausstehendes Guthaben die Erstattung deckt. */
+export function cardRefundCoveredByBalance(input: {
+  refundCents: number;
+  availableCents: number;
+  pendingCents: number;
+}) {
+  const refund = Math.max(0, Math.trunc(input.refundCents));
+  if (refund <= 0) return true;
+  return input.availableCents + input.pendingCents >= refund;
+}
+
 /**
  * Kartenbetrag abzüglich Gebühr. Liegt der Rest unter 0,50 €, geht der volle
  * Kartenbetrag zurück: Stripe nimmt kleinere Teilbeträge nicht an.
@@ -94,6 +113,26 @@ function paymentFromSession(session: Stripe.Checkout.Session) {
   };
 }
 
+async function assertRefundCovered(stripe: Stripe, amountCents: number) {
+  let balance: Stripe.Balance;
+  try {
+    balance = await stripe.balance.retrieve();
+  } catch (error) {
+    console.error("Stripe-Saldo", error);
+    return;
+  }
+  const covered = cardRefundCoveredByBalance({
+    refundCents: amountCents,
+    availableCents: eurBalanceCents(balance.available),
+    pendingCents: eurBalanceCents(balance.pending),
+  });
+  if (!covered) {
+    throw new Error(
+      "Das Stripe-Konto dieser Sektion hat nicht genug Guthaben für die Erstattung.",
+    );
+  }
+}
+
 async function createRefund(
   stripe: Stripe,
   input: {
@@ -103,7 +142,8 @@ async function createRefund(
     idempotencyKey: string;
   },
 ) {
-  await stripe.refunds.create(
+  await assertRefundCovered(stripe, input.amountCents);
+  const refund = await stripe.refunds.create(
     {
       ...(input.chargeId
         ? { charge: input.chargeId }
@@ -112,6 +152,11 @@ async function createRefund(
     },
     { idempotencyKey: input.idempotencyKey },
   );
+  if (refund.status === "failed") {
+    throw new Error(
+      "Das Stripe-Konto dieser Sektion hat nicht genug Guthaben für die Erstattung.",
+    );
+  }
 }
 
 async function refundLoadedSession(
