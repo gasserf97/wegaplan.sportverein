@@ -368,11 +368,7 @@ export async function saveSectionPaymentAction(
     },
     update: {
       bankAccountHolder: String(formData.get("bankAccountHolder") ?? "").trim(),
-      bankIban: keepSecret(
-        String(formData.get("bankIban") ?? ""),
-        previous?.bankIban ?? "",
-        formData.get("clearIban") === "on",
-      ),
+      bankIban: encryptSecret(String(formData.get("bankIban") ?? "")),
       stripeSecretKey: keepSecret(
         String(formData.get("stripeSecretKey") ?? ""),
         previous?.stripeSecretKey ?? "",

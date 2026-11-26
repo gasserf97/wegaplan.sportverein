@@ -9,6 +9,7 @@ import {
   saveSectionPaymentAction,
 } from "@/app/actions/platform";
 import { PlatformForm } from "@/components/platform-form";
+import { formatIban } from "@/lib/bank-transfer";
 import { decryptSecret } from "@/lib/club-secrets";
 import { getPlatformAdmin } from "@/lib/platform-auth";
 import { prisma } from "@/lib/prisma";
@@ -288,6 +289,11 @@ export default async function ClubSettingsPage({
                     Zuerst Kontoinhaber und IBAN speichern. Darauf zahlt Stripe die
                     Kartenzahlungen dieser Sektion aus.
                   </p>
+                ) : !platformKeyReady ? (
+                  <p className="mt-2 text-xs text-amber-700">
+                    Die IBAN ist gespeichert. Stripe-Konto eröffnen bleibt aus, bis
+                    in Render <code>STRIPE_CONNECT_SECRET_KEY</code> gesetzt ist.
+                  </p>
                 ) : null}
                 <div className="mt-3">
                   <PlatformForm
@@ -302,7 +308,7 @@ export default async function ClubSettingsPage({
                       {
                         name: "bankIban",
                         label: "IBAN",
-                        hint: config?.bankIban ? "Gespeichert. Leer lassen zum Behalten." : undefined,
+                        defaultValue: iban ? formatIban(iban) : "",
                       },
                       ...(accountId
                         ? []
