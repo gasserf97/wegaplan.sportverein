@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
-  openSectionStripeDashboardAction,
-  openSectionStripeOnboardingAction,
   refreshSectionStripeStatusAction,
   resendClubAdminInviteAction,
   saveClubSettingsAction,
@@ -254,24 +252,27 @@ export default async function ClubSettingsPage({
                 ) : null}
                 <div className="mt-3 flex flex-wrap gap-2">
                   {chargesEnabled ? (
-                    <form action={openSectionStripeDashboardAction.bind(null, section.id)}>
-                      <button
-                        type="submit"
-                        className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm text-primary-foreground"
-                      >
-                        Stripe-Dashboard öffnen
-                      </button>
-                    </form>
+                    <a
+                      href={`/vereine/${club.id}/stripe/${section.id}/dashboard`}
+                      className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm text-primary-foreground"
+                    >
+                      Stripe-Dashboard öffnen
+                    </a>
+                  ) : platformKeyReady && iban ? (
+                    <a
+                      href={`/vereine/${club.id}/stripe/${section.id}/erneuern`}
+                      className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm text-primary-foreground"
+                    >
+                      {accountId ? "Einrichtung fortsetzen" : "Stripe-Konto eröffnen"}
+                    </a>
                   ) : (
-                    <form action={openSectionStripeOnboardingAction.bind(null, section.id)}>
-                      <button
-                        type="submit"
-                        className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-60"
-                        disabled={!platformKeyReady || !iban}
-                      >
-                        {accountId ? "Einrichtung fortsetzen" : "Stripe-Konto eröffnen"}
-                      </button>
-                    </form>
+                    <button
+                      type="button"
+                      className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-60"
+                      disabled
+                    >
+                      {accountId ? "Einrichtung fortsetzen" : "Stripe-Konto eröffnen"}
+                    </button>
                   )}
                   {accountId ? (
                     <form action={refreshSectionStripeStatusAction.bind(null, section.id)}>

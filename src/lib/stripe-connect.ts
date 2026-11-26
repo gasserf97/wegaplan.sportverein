@@ -289,11 +289,18 @@ export async function refreshSectionConnectStatus(sectionId: string) {
 async function operatorOrigin() {
   try {
     const headerList = await headers();
-    const rawHost = (headerList.get("host") || "").split(",")[0]?.trim() ?? "";
-    const name = rawHost.replace(/:\d+$/, "").toLowerCase();
+    const raw =
+      headerList.get("x-forwarded-host") ||
+      headerList.get("x-club-host") ||
+      headerList.get("host") ||
+      "";
+    const host = (raw.split(",")[0] ?? "").trim().toLowerCase();
+    const name = host.replace(/:\d+$/, "");
     const local =
       name === "localhost" || name === "127.0.0.1" || name.endsWith(".localhost");
-    if (rawHost && local) return `http://${rawHost.toLowerCase()}`;
+    if (host && local) return `http://${host}`;
+    const { isPlatformHost } = await import("@/lib/host");
+    if (host && isPlatformHost(host)) return `https://${name}`;
   } catch {
     // außerhalb einer Anfrage
   }
@@ -315,17 +322,35 @@ function safeStripeDetail(error: unknown) {
 
 async function accountLink(accountId: string, clubId: string, sectionId: string) {
   const base = await operatorOrigin();
-  return getPlatformStripe().v2.core.accountLinks.create({
-    account: accountId,
-    use_case: {
+  const refreshUrl = `${base}/vereine/${clubId}/stripe/${sectionId}/erneuern`;
+  const returnUrl = `${base}/vereine/${clubId}/stripe/${sectionId}/zurueck`;
+  const stripe = getPlatformStripe();
+  // v1-Links funktionieren mit v2-Konten und sind für den Browser-Redirect robuster.
+  try {
+    return await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: refreshUrl,
+      return_url: returnUrl,
       type: "account_onboarding",
-      account_onboarding: {
-        configurations: ["merchant"],
-        refresh_url: `${base}/vereine/${clubId}/stripe/${sectionId}/erneuern`,
-        return_url: `${base}/vereine/${clubId}/stripe/${sectionId}/zurueck`,
+      collection_options: { fields: "eventually_due" },
+    });
+  } catch (error) {
+    console.warn("Stripe AccountLink v1", accountId, safeStripeDetail(error));
+    return stripe.v2.core.accountLinks.create(
+      {
+        account: accountId,
+        use_case: {
+          type: "account_onboarding",
+          account_onboarding: {
+            configurations: ["merchant"],
+            refresh_url: refreshUrl,
+            return_url: returnUrl,
+          },
+        },
       },
-    },
-  });
+      { apiVersion: "2026-11-18.preview" },
+    );
+  }
 }
 
 function isUnsupportedConnectConfig(error: unknown) {
@@ -473,12 +498,13 @@ export async function beginSectionStripeOnboarding(sectionId: string): Promise<
       await saveConnectAccount(await stripe.accounts.retrieve(accountId));
     }
 
-    await syncSectionPayoutBank(section.id);
-
     const ready =
       Boolean(section.paymentConfig?.stripeChargesEnabled) &&
       Boolean(section.paymentConfig?.stripeDetailsSubmitted);
+    // IBAN erst nach der Stripe-Einrichtung anhängen, sonst kann die
+    // Hosted-Onboarding-Seite von Stripe leer bleiben.
     if (ready) {
+      await syncSectionPayoutBank(section.id);
       try {
         const login = await stripe.accounts.createLoginLink(accountId);
         return { url: login.url };
