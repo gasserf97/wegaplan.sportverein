@@ -115,8 +115,8 @@ export default async function ClubSettingsPage({
       <section className="rounded-xl border border-border bg-card p-5">
         <h2 className="text-2xl">Verein und Versand</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Mail-Felder leer lassen, wenn der Verein den zentralen Versand unter Vereine
-          nutzen soll. Dann erscheint nur der Vereinsname als Anzeigename.
+          Standard ist der zentrale Versand unter Vereine. Eigene Mail-Zugangsdaten
+          nur bei Bedarf aufklappen.
         </p>
         <div className="mt-4">
           <PlatformForm
@@ -129,9 +129,6 @@ export default async function ClubSettingsPage({
                 label: "Vorführ-Modus (Testkarte, solange kein Stripe-Konto verbunden ist)",
                 defaultChecked: settings.showcaseMode,
               },
-              { name: "clearBrevo", label: "Brevo-Key löschen" },
-              { name: "clearResend", label: "Resend-Key löschen" },
-              { name: "clearSmtp", label: "SMTP-Passwort löschen" },
             ]}
             fields={[
               { name: "name", label: "Name", defaultValue: club.name },
@@ -149,39 +146,6 @@ export default async function ClubSettingsPage({
               },
               { name: "impressumUrl", label: "Impressum-URL", defaultValue: settings.impressumUrl },
               {
-                name: "mailProvider",
-                label: "Mail-Anbieter (brevo, resend, smtp)",
-                defaultValue: settings.mailProvider,
-                hint: "Leer = zentraler Plattform-Versand",
-              },
-              {
-                name: "mailFrom",
-                label: "Absender",
-                defaultValue: settings.mailFrom,
-                hint: "Nur bei eigenem Versand nötig",
-              },
-              {
-                name: "brevoApiKey",
-                label: "Brevo API-Key",
-                type: "password",
-                hint: settings.brevoApiKey ? "Gespeichert. Leer lassen zum Behalten." : undefined,
-              },
-              {
-                name: "resendApiKey",
-                label: "Resend API-Key",
-                type: "password",
-                hint: settings.resendApiKey ? "Gespeichert. Leer lassen zum Behalten." : undefined,
-              },
-              { name: "smtpHost", label: "SMTP-Host", defaultValue: settings.smtpHost },
-              { name: "smtpPort", label: "SMTP-Port", defaultValue: settings.smtpPort },
-              { name: "smtpUser", label: "SMTP-Benutzer", defaultValue: settings.smtpUser },
-              {
-                name: "smtpPass",
-                label: "SMTP-Passwort",
-                type: "password",
-                hint: settings.smtpPass ? "Gespeichert. Leer lassen zum Behalten." : undefined,
-              },
-              {
                 name: "registrationBackupEmail",
                 label: "Backup-E-Mail",
                 defaultValue: settings.registrationBackupEmail,
@@ -194,6 +158,57 @@ export default async function ClubSettingsPage({
               { name: "stripeFeePercent", label: "Stripe-Gebühr Prozent", defaultValue: settings.stripeFeePercent },
               { name: "stripeFeeFixedCents", label: "Stripe-Gebühr Fixbetrag in Cent", defaultValue: settings.stripeFeeFixedCents },
             ]}
+            collapsed={{
+              title: "Eigener Mail-Versand (optional)",
+              hint: "Leer lassen = zentraler Plattform-Versand. Anzeigename bleibt der Vereinsname.",
+              open: Boolean(settings.mailProvider?.trim()),
+              checks: [
+                { name: "clearBrevo", label: "Brevo-Key löschen" },
+                { name: "clearResend", label: "Resend-Key löschen" },
+                { name: "clearSmtp", label: "SMTP-Passwort löschen" },
+              ],
+              fields: [
+                {
+                  name: "mailProvider",
+                  label: "Mail-Anbieter (brevo, resend, smtp)",
+                  defaultValue: settings.mailProvider,
+                  hint: "Leer = zentraler Plattform-Versand",
+                },
+                {
+                  name: "mailFrom",
+                  label: "Absender",
+                  defaultValue: settings.mailFrom,
+                  hint: "Nur bei eigenem Versand nötig",
+                },
+                {
+                  name: "brevoApiKey",
+                  label: "Brevo API-Key",
+                  type: "password",
+                  hint: settings.brevoApiKey
+                    ? "Gespeichert. Leer lassen zum Behalten."
+                    : undefined,
+                },
+                {
+                  name: "resendApiKey",
+                  label: "Resend API-Key",
+                  type: "password",
+                  hint: settings.resendApiKey
+                    ? "Gespeichert. Leer lassen zum Behalten."
+                    : undefined,
+                },
+                { name: "smtpHost", label: "SMTP-Host", defaultValue: settings.smtpHost },
+                { name: "smtpPort", label: "SMTP-Port", defaultValue: settings.smtpPort },
+                { name: "smtpUser", label: "SMTP-Benutzer", defaultValue: settings.smtpUser },
+                {
+                  name: "smtpPass",
+                  label: "SMTP-Passwort",
+                  type: "password",
+                  hint: settings.smtpPass
+                    ? "Gespeichert. Leer lassen zum Behalten."
+                    : undefined,
+                },
+              ],
+            }}
           />
         </div>
       </section>
