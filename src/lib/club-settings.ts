@@ -67,29 +67,87 @@ export function clubMailFromAddress(mailFrom: string, backupEmail: string) {
   return backup;
 }
 
-/** null = Prozess-Umgebung nutzen (Legacy, kein Verein, oder Mail noch nicht am Verein). */
+const PLATFORM_SETTINGS_ID = "default";
+
+export async function getPlatformSettings() {
+  return prisma.platformSettings.upsert({
+    where: { id: PLATFORM_SETTINGS_ID },
+    create: { id: PLATFORM_SETTINGS_ID },
+    update: {},
+  });
+}
+
+function overlayFromMailSettings(settings: {
+  mailProvider: string;
+  mailFrom: string;
+  brevoApiKey: string;
+  resendApiKey: string;
+  smtpHost: string;
+  smtpPort: string;
+  smtpUser: string;
+  smtpPass: string;
+}): MailEnvOverlay | null {
+  if (!clubMailConfigured(settings)) return null;
+  const mailFrom = settings.mailFrom.trim();
+  const resolved =
+    mailFrom.includes("@")
+      ? mailFrom
+      : settings.smtpUser.includes("@")
+        ? mailFrom
+          ? `${mailFrom} <${settings.smtpUser.trim()}>`
+          : settings.smtpUser.trim()
+        : mailFrom;
+  if (!resolved.includes("@")) return null;
+  return {
+    MAIL_PROVIDER: settings.mailProvider ?? "",
+    MAIL_FROM: resolved,
+    BREVO_API_KEY: decryptSecret(settings.brevoApiKey ?? ""),
+    RESEND_API_KEY: decryptSecret(settings.resendApiKey ?? ""),
+    SMTP_HOST: settings.smtpHost ?? "",
+    SMTP_PORT: settings.smtpPort ?? "",
+    SMTP_USER: settings.smtpUser ?? "",
+    SMTP_PASS: decryptSecret(settings.smtpPass ?? ""),
+  };
+}
+
+/** Anzeigename im Absender: Briefname, sonst Vereinsname. Ohne Verein leer. */
+export async function clubSenderDisplayName() {
+  const club = await getCurrentClubRecord();
+  if (!club) return "";
+  const letter = club.settings?.letterName?.trim() ?? "";
+  return letter || club.name.trim() || "";
+}
+
+/**
+ * Vereinseigene Mail, sonst zentrale Plattform-Mail, sonst Prozess-Umgebung.
+ * Den Anzeigenamen setzt `mail.ts` aus dem aktuellen Verein.
+ */
 export async function mailEnvOverlay(): Promise<MailEnvOverlay | null> {
   const club = await getCurrentClubRecord();
-  if (!club) return null;
-  if (usesLegacyEnv(club)) return null;
-  const settings = club.settings;
-  if (!clubMailConfigured(settings)) return null;
-  const mailFrom = clubMailFromAddress(
-    settings?.mailFrom ?? "",
-    settings?.registrationBackupEmail ?? "",
-  );
-  // Unvollständiger Absender darf die Plattform-Mail nicht verdecken.
-  if (!mailFrom.includes("@")) return null;
-  return {
-    MAIL_PROVIDER: settings?.mailProvider ?? "",
-    MAIL_FROM: mailFrom,
-    BREVO_API_KEY: decryptSecret(settings?.brevoApiKey ?? ""),
-    RESEND_API_KEY: decryptSecret(settings?.resendApiKey ?? ""),
-    SMTP_HOST: settings?.smtpHost ?? "",
-    SMTP_PORT: settings?.smtpPort ?? "",
-    SMTP_USER: settings?.smtpUser ?? "",
-    SMTP_PASS: decryptSecret(settings?.smtpPass ?? ""),
-  };
+  if (club && !usesLegacyEnv(club)) {
+    const settings = club.settings;
+    if (clubMailConfigured(settings)) {
+      const mailFrom = clubMailFromAddress(
+        settings?.mailFrom ?? "",
+        settings?.registrationBackupEmail ?? "",
+      );
+      if (mailFrom.includes("@")) {
+        return {
+          MAIL_PROVIDER: settings?.mailProvider ?? "",
+          MAIL_FROM: mailFrom,
+          BREVO_API_KEY: decryptSecret(settings?.brevoApiKey ?? ""),
+          RESEND_API_KEY: decryptSecret(settings?.resendApiKey ?? ""),
+          SMTP_HOST: settings?.smtpHost ?? "",
+          SMTP_PORT: settings?.smtpPort ?? "",
+          SMTP_USER: settings?.smtpUser ?? "",
+          SMTP_PASS: decryptSecret(settings?.smtpPass ?? ""),
+        };
+      }
+    }
+  }
+
+  const platform = await getPlatformSettings();
+  return overlayFromMailSettings(platform);
 }
 
 export async function registrationBackupEmailSetting() {

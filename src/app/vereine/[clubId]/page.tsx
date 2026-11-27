@@ -114,6 +114,10 @@ export default async function ClubSettingsPage({
 
       <section className="rounded-xl border border-border bg-card p-5">
         <h2 className="text-2xl">Verein und Versand</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Mail-Felder leer lassen, wenn der Verein den zentralen Versand unter Vereine
+          nutzen soll. Dann erscheint nur der Vereinsname als Anzeigename.
+        </p>
         <div className="mt-4">
           <PlatformForm
             action={save}
@@ -144,8 +148,18 @@ export default async function ClubSettingsPage({
                 hint: "Komma-getrennt, z. B. app.asclajen.com",
               },
               { name: "impressumUrl", label: "Impressum-URL", defaultValue: settings.impressumUrl },
-              { name: "mailProvider", label: "Mail-Anbieter (brevo, resend, smtp)", defaultValue: settings.mailProvider },
-              { name: "mailFrom", label: "Absender", defaultValue: settings.mailFrom },
+              {
+                name: "mailProvider",
+                label: "Mail-Anbieter (brevo, resend, smtp)",
+                defaultValue: settings.mailProvider,
+                hint: "Leer = zentraler Plattform-Versand",
+              },
+              {
+                name: "mailFrom",
+                label: "Absender",
+                defaultValue: settings.mailFrom,
+                hint: "Nur bei eigenem Versand nötig",
+              },
               {
                 name: "brevoApiKey",
                 label: "Brevo API-Key",

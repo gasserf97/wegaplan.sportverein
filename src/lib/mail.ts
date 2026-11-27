@@ -45,6 +45,25 @@ async function clubMailName() {
   }
 }
 
+async function clubSenderName() {
+  try {
+    const { clubSenderDisplayName } = await import("@/lib/club-settings");
+    return await clubSenderDisplayName();
+  } catch {
+    return "";
+  }
+}
+
+/** „Verein <mail@domain>“ – wenn MAIL_FROM schon einen Namen hat, bleibt er. */
+function withSenderDisplayName(rawFrom: string, displayName: string) {
+  const parsed = parseFromAddress(rawFrom);
+  if (!parsed) return rawFrom;
+  if (parsed.name?.trim()) return rawFrom;
+  const name = displayName.trim().replace(/[\r\n<>"]/g, "");
+  if (!name) return parsed.email;
+  return `${name} <${parsed.email}>`;
+}
+
 function stripQuotes(value: string) {
   let next = value.trim();
   if (
@@ -531,16 +550,17 @@ async function deliverMail(options: {
   const fromResult = getMailFrom();
   if ("sent" in fromResult) return fromResult;
 
-  const fromValidation = validateFromForProvider(provider, fromResult.from);
+  const from = withSenderDisplayName(fromResult.from, await clubSenderName());
+  const fromValidation = validateFromForProvider(provider, from);
   if (fromValidation) return fromValidation;
 
   if (provider === "brevo") {
-    return sendViaBrevo({ from: fromResult.from, ...options });
+    return sendViaBrevo({ from, ...options });
   }
   if (provider === "resend") {
-    return sendViaResend({ from: fromResult.from, ...options });
+    return sendViaResend({ from, ...options });
   }
-  return sendViaSmtp({ from: fromResult.from, ...options });
+  return sendViaSmtp({ from, ...options });
 }
 
 function escapeHtml(value: string) {

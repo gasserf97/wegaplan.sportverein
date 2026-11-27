@@ -1,15 +1,28 @@
-import { platformLoginAction, platformLogoutAction, createClubAction, openClubAdminAction } from "@/app/actions/platform";
+import {
+  platformLoginAction,
+  platformLogoutAction,
+  createClubAction,
+  openClubAdminAction,
+  savePlatformMailAction,
+} from "@/app/actions/platform";
 import { ensurePlatformAdmin, getPlatformAdmin } from "@/lib/platform-auth";
+import { getPlatformSettings } from "@/lib/club-settings";
 import { prisma } from "@/lib/prisma";
 import { clubPublicUrlLabel, requestHostHeader, supportsClubSubdomains } from "@/lib/tenant";
 import { PlatformForm } from "@/components/platform-form";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClubsPage() {
+export default async function ClubsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await ensurePlatformAdmin();
   const admin = await getPlatformAdmin();
   const host = await requestHostHeader().catch(() => "");
+  const params = await searchParams;
+  const mailSaved = params.mail === "gespeichert";
 
   if (!admin) {
     return (
@@ -36,13 +49,16 @@ export default async function ClubsPage() {
     );
   }
 
-  const clubs = await prisma.club.findMany({
-    orderBy: { name: "asc" },
-    include: {
-      hosts: true,
-      _count: { select: { users: true } },
-    },
-  });
+  const [clubs, platformMail] = await Promise.all([
+    prisma.club.findMany({
+      orderBy: { name: "asc" },
+      include: {
+        hosts: true,
+        _count: { select: { users: true } },
+      },
+    }),
+    getPlatformSettings(),
+  ]);
 
   return (
     <main className="mx-auto grid w-full max-w-3xl gap-10 px-4 py-12">
@@ -62,6 +78,80 @@ export default async function ClubsPage() {
           </button>
         </form>
       </div>
+
+      <section className="rounded-xl border border-border bg-card p-5">
+        <h2 className="text-2xl">Zentraler E-Mail-Versand</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Alle Vereine ohne eigene Mail-Zugangsdaten versenden darüber. Im Posteingang
+          erscheint der Vereinsname als Absender, die Adresse bleibt Ihre zentrale Mail.
+        </p>
+        {mailSaved ? (
+          <p className="mt-3 text-sm text-primary">Mail-Einstellungen gespeichert.</p>
+        ) : null}
+        <div className="mt-4">
+          <PlatformForm
+            action={savePlatformMailAction}
+            submitLabel="Mail speichern"
+            checks={[
+              { name: "clearBrevo", label: "Brevo-Key löschen" },
+              { name: "clearResend", label: "Resend-Key löschen" },
+              { name: "clearSmtp", label: "SMTP-Passwort löschen" },
+            ]}
+            fields={[
+              {
+                name: "mailProvider",
+                label: "Mail-Anbieter (brevo, resend, smtp)",
+                defaultValue: platformMail.mailProvider,
+              },
+              {
+                name: "mailFrom",
+                label: "Absender-Adresse",
+                defaultValue: platformMail.mailFrom,
+                hint: "z. B. info@wegaclub.com – Vereinsname setzt die Software davor",
+              },
+              {
+                name: "brevoApiKey",
+                label: "Brevo API-Key",
+                type: "password",
+                hint: platformMail.brevoApiKey
+                  ? "Gespeichert. Leer lassen zum Behalten."
+                  : undefined,
+              },
+              {
+                name: "resendApiKey",
+                label: "Resend API-Key",
+                type: "password",
+                hint: platformMail.resendApiKey
+                  ? "Gespeichert. Leer lassen zum Behalten."
+                  : undefined,
+              },
+              {
+                name: "smtpHost",
+                label: "SMTP-Host",
+                defaultValue: platformMail.smtpHost,
+              },
+              {
+                name: "smtpPort",
+                label: "SMTP-Port",
+                defaultValue: platformMail.smtpPort,
+              },
+              {
+                name: "smtpUser",
+                label: "SMTP-Benutzer",
+                defaultValue: platformMail.smtpUser,
+              },
+              {
+                name: "smtpPass",
+                label: "SMTP-Passwort",
+                type: "password",
+                hint: platformMail.smtpPass
+                  ? "Gespeichert. Leer lassen zum Behalten."
+                  : undefined,
+              },
+            ]}
+          />
+        </div>
+      </section>
 
       <ul className="grid gap-3">
         {clubs.map((club) => (

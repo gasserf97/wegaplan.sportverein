@@ -257,6 +257,74 @@ export async function openClubAdminAction(clubId: string) {
   redirect(url.toString());
 }
 
+export async function savePlatformMailAction(
+  _prev: PlatformState,
+  formData: FormData,
+): Promise<PlatformState> {
+  const actor = await requirePlatform();
+  if (!actor) return { error: "Bitte anmelden." };
+
+  const { getPlatformSettings } = await import("@/lib/club-settings");
+  const previous = await getPlatformSettings();
+  const mailProvider = String(formData.get("mailProvider") ?? "")
+    .trim()
+    .toLowerCase();
+  if (mailProvider && !["smtp", "brevo", "resend"].includes(mailProvider)) {
+    return { error: "Mail-Anbieter: smtp, brevo oder resend." };
+  }
+
+  await prisma.platformSettings.upsert({
+    where: { id: "default" },
+    create: {
+      id: "default",
+      mailProvider,
+      mailFrom: String(formData.get("mailFrom") ?? "").trim(),
+      brevoApiKey: keepSecret(
+        String(formData.get("brevoApiKey") ?? ""),
+        "",
+        formData.get("clearBrevo") === "on",
+      ),
+      resendApiKey: keepSecret(
+        String(formData.get("resendApiKey") ?? ""),
+        "",
+        formData.get("clearResend") === "on",
+      ),
+      smtpHost: String(formData.get("smtpHost") ?? "").trim(),
+      smtpPort: String(formData.get("smtpPort") ?? "").trim(),
+      smtpUser: String(formData.get("smtpUser") ?? "").trim(),
+      smtpPass: keepSecret(
+        String(formData.get("smtpPass") ?? ""),
+        "",
+        formData.get("clearSmtp") === "on",
+      ),
+    },
+    update: {
+      mailProvider,
+      mailFrom: String(formData.get("mailFrom") ?? "").trim(),
+      brevoApiKey: keepSecret(
+        String(formData.get("brevoApiKey") ?? ""),
+        previous.brevoApiKey,
+        formData.get("clearBrevo") === "on",
+      ),
+      resendApiKey: keepSecret(
+        String(formData.get("resendApiKey") ?? ""),
+        previous.resendApiKey,
+        formData.get("clearResend") === "on",
+      ),
+      smtpHost: String(formData.get("smtpHost") ?? "").trim(),
+      smtpPort: String(formData.get("smtpPort") ?? "").trim(),
+      smtpUser: String(formData.get("smtpUser") ?? "").trim(),
+      smtpPass: keepSecret(
+        String(formData.get("smtpPass") ?? ""),
+        previous.smtpPass,
+        formData.get("clearSmtp") === "on",
+      ),
+    },
+  });
+
+  redirect("/vereine?mail=gespeichert");
+}
+
 export async function saveClubSettingsAction(
   clubId: string,
   _prev: PlatformState,

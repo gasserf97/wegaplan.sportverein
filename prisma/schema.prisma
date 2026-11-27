@@ -785,6 +785,21 @@ model PlatformAdmin {
   createdAt    DateTime @default(now())
 }
 
+/// Ein Datensatz für den gesamten Betreiber (id = default).
+/// Vereine ohne eigene Mail-Zugangsdaten nutzen diese Einstellungen.
+model PlatformSettings {
+  id           String   @id @default("default")
+  mailProvider String   @default("")
+  mailFrom     String   @default("")
+  brevoApiKey  String   @default("")
+  resendApiKey String   @default("")
+  smtpHost     String   @default("")
+  smtpPort     String   @default("")
+  smtpUser     String   @default("")
+  smtpPass     String   @default("")
+  updatedAt    DateTime @updatedAt
+}
+
 /// Vereins-Einstellungen, die früher Environment-Variablen waren.
 /// Geheimnisse (API-Keys, SMTP-Passwort) sind verschlüsselt.
 /// configuredAt leer = beim Verein „lajen“ noch die alten Umgebungsvariablen nutzen.
