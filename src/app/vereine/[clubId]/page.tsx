@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
-  refreshSectionStripeStatusAction,
   resendClubAdminInviteAction,
   saveClubSettingsAction,
   saveSectionPaymentAction,
@@ -11,8 +10,7 @@ import { formatIban } from "@/lib/bank-transfer";
 import { decryptSecret } from "@/lib/club-secrets";
 import { getPlatformAdmin } from "@/lib/platform-auth";
 import { prisma } from "@/lib/prisma";
-import { connectWebhookUrl, platformStripeSecret } from "@/lib/stripe-connect";
-import { runWithClub } from "@/lib/tenant";
+import { clubPublicUrl, runWithClub } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -55,8 +53,7 @@ export default async function ClubSettingsPage({
   const invitePending = Boolean(
     firstAdmin && (!firstAdmin.emailVerifiedAt || firstAdmin.emailVerifyToken),
   );
-  const webhookUrl = await connectWebhookUrl();
-  const platformKeyReady = Boolean(platformStripeSecret());
+  const webhookUrl = `${clubPublicUrl(club.slug)}/api/stripe/webhook`;
   const stripeNotice =
     stripe === "zurueck"
       ? "Stripe-Status dieser Sektion wurde übernommen."
@@ -216,24 +213,16 @@ export default async function ClubSettingsPage({
       <section className="grid gap-4">
         <h2 className="text-2xl">Zahlungen je Sektion</h2>
         <p className="text-sm text-muted-foreground">
-          Jede Sektion hat ihr eigenes Stripe-Konto. Kartenzahlung und
-          Auszahlung gehen auf die IBAN dieser Sektion. Es gibt kein gemeinsames
-          Vereinskonto.
+          Jede Sektion hat ihr eigenes Stripe-Konto. Legen Sie es im
+          Stripe-Dashboard als normales Konto an und tragen Sie hier den Secret
+          Key und das Webhook-Geheimnis ein. Die IBAN gilt für Überweisungen.
         </p>
-        {!platformKeyReady ? (
-          <p className="text-xs text-amber-700">
-            In der Umgebung <code>STRIPE_CONNECT_SECRET_KEY</code> und{" "}
-            <code>STRIPE_CONNECT_WEBHOOK_SECRET</code> setzen. Das ist der Schlüssel
-            der Plattform. Jede Sektion bekommt danach ein eigenes verbundenes Konto.
-          </p>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            Webhook auf verbundene Konten:{" "}
-            <code className="break-all text-foreground">{webhookUrl}</code>. Events:{" "}
-            <code>account.updated</code>, <code>checkout.session.completed</code>,{" "}
-            <code>checkout.session.expired</code>, <code>invoice.paid</code>.
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground">
+          Webhook in jedem dieser Konten:{" "}
+          <code className="break-all text-foreground">{webhookUrl}</code>. Events:{" "}
+          <code>checkout.session.completed</code>,{" "}
+          <code>checkout.session.expired</code>, <code>invoice.paid</code>.
+        </p>
         {club.sections.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Noch keine Sektionen. Der Vereins-Admin legt sie an, danach tragen Sie hier die IBAN ein.
@@ -243,6 +232,7 @@ export default async function ClubSettingsPage({
             const config = section.paymentConfig;
             const iban = decryptSecret(config?.bankIban ?? "");
             const accountId = config?.stripeAccountId ?? "";
+            const hasOwnKey = Boolean(config?.stripeSecretKey);
             const chargesEnabled = Boolean(config?.stripeChargesEnabled);
             const payoutLast4 = config?.stripePayoutLast4 ?? "";
             const ibanLast4 = iban.replace(/\s/g, "").slice(-4);
@@ -258,11 +248,9 @@ export default async function ClubSettingsPage({
                 <h3 className="text-lg">{section.name}</h3>
                 <p className="mt-1 text-xs text-muted-foreground">
                   IBAN {iban ? "gespeichert" : "fehlt"}
-                  {accountId
-                    ? chargesEnabled
-                      ? " · Kartenzahlung auf dieses Konto"
-                      : " · Stripe-Konto angelegt, Einrichtung offen"
-                    : " · noch kein eigenes Stripe-Konto"}
+                  {hasOwnKey
+                    ? " · eigenes Stripe-Konto hinterlegt"
+                    : " · noch kein Secret Key"}
                 </p>
                 {stripeSectionId === section.id && stripeNotice ? (
                   <p className="mt-2 text-sm text-primary">{stripeNotice}</p>
@@ -279,50 +267,17 @@ export default async function ClubSettingsPage({
                     Stripe zahlt auf ein anderes Konto als die IBAN dieser Sektion.
                   </p>
                 ) : null}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {chargesEnabled ? (
-                    <a
-                      href={`/vereine/${club.id}/stripe/${section.id}/dashboard`}
-                      className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm text-primary-foreground"
-                    >
-                      Stripe-Dashboard öffnen
-                    </a>
-                  ) : platformKeyReady && iban ? (
-                    <a
-                      href={`/vereine/${club.id}/stripe/${section.id}/erneuern`}
-                      className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm text-primary-foreground"
-                    >
-                      {accountId ? "Einrichtung fortsetzen" : "Stripe-Konto eröffnen"}
-                    </a>
-                  ) : (
-                    <button
-                      type="button"
-                      className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm text-primary-foreground disabled:opacity-60"
-                      disabled
-                    >
-                      {accountId ? "Einrichtung fortsetzen" : "Stripe-Konto eröffnen"}
-                    </button>
-                  )}
-                  {accountId ? (
-                    <form action={refreshSectionStripeStatusAction.bind(null, section.id)}>
-                      <button
-                        type="submit"
-                        className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm"
-                      >
-                        Status aktualisieren
-                      </button>
-                    </form>
-                  ) : null}
-                </div>
+                {accountId && !hasOwnKey ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Ein verbundenes Konto liegt noch vor
+                    {chargesEnabled ? " und nimmt Kartenzahlungen an" : ""}. Sobald
+                    der Secret Key gespeichert ist, gilt das normale Konto.
+                  </p>
+                ) : null}
                 {!iban ? (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Zuerst Kontoinhaber und IBAN speichern. Darauf zahlt Stripe die
-                    Kartenzahlungen dieser Sektion aus.
-                  </p>
-                ) : !platformKeyReady ? (
-                  <p className="mt-2 text-xs text-amber-700">
-                    Die IBAN ist gespeichert. Stripe-Konto eröffnen bleibt aus, bis
-                    in Render <code>STRIPE_CONNECT_SECRET_KEY</code> gesetzt ist.
+                    Kontoinhaber und IBAN brauchen Überweisungen. Kartenzahlung
+                    braucht zusätzlich den Secret Key.
                   </p>
                 ) : null}
                 <div className="mt-3">
@@ -340,26 +295,22 @@ export default async function ClubSettingsPage({
                         label: "IBAN",
                         defaultValue: iban ? formatIban(iban) : "",
                       },
-                      ...(accountId
-                        ? []
-                        : [
-                            {
-                              name: "stripeSecretKey",
-                              label: "Stripe Secret Key",
-                              type: "password",
-                              hint: config?.stripeSecretKey
-                                ? "Gespeichert. Leer lassen zum Behalten. Nur ohne Connect-Konto."
-                                : "Nur solange diese Sektion kein Connect-Konto hat.",
-                            },
-                            {
-                              name: "stripeWebhookSecret",
-                              label: "Stripe Webhook Secret",
-                              type: "password",
-                              hint: config?.stripeWebhookSecret
-                                ? "Gespeichert. Leer lassen zum Behalten."
-                                : undefined,
-                            },
-                          ]),
+                      {
+                        name: "stripeSecretKey",
+                        label: "Stripe Secret Key",
+                        type: "password",
+                        hint: hasOwnKey
+                          ? "Gespeichert. Leer lassen zum Behalten."
+                          : "sk_… oder rk_… aus dem normalen Stripe-Konto dieser Sektion.",
+                      },
+                      {
+                        name: "stripeWebhookSecret",
+                        label: "Stripe Webhook Secret",
+                        type: "password",
+                        hint: config?.stripeWebhookSecret
+                          ? "Gespeichert. Leer lassen zum Behalten."
+                          : "whsec_… vom Webhook in diesem Stripe-Konto.",
+                      },
                     ]}
                   />
                 </div>

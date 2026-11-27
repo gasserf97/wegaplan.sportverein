@@ -2,23 +2,42 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { cardRail } from "./stripe-connect-mode";
 
-test("ein freigeschaltetes Connect-Konto nimmt die Kartenzahlung", () => {
+test("ein eigener Secret Key geht vor ein verbundenes Konto", () => {
   assert.equal(
     cardRail({
       accountId: "acct_123",
       chargesEnabled: true,
       legacyReady: true,
     }),
-    "connect",
+    "legacy",
   );
-});
-
-test("ein noch nicht freigeschaltetes Konto blockiert die alten Schlüssel", () => {
   assert.equal(
     cardRail({
       accountId: "acct_123",
       chargesEnabled: false,
       legacyReady: true,
+    }),
+    "legacy",
+  );
+});
+
+test("ohne Secret Key nimmt ein freigeschaltetes verbundenes Konto die Zahlung", () => {
+  assert.equal(
+    cardRail({
+      accountId: "acct_123",
+      chargesEnabled: true,
+      legacyReady: false,
+    }),
+    "connect",
+  );
+});
+
+test("ein noch nicht freigeschaltetes Konto ohne Schlüssel blockiert die Zahlung", () => {
+  assert.equal(
+    cardRail({
+      accountId: "acct_123",
+      chargesEnabled: false,
+      legacyReady: false,
     }),
     "pending",
   );

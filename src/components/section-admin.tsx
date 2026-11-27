@@ -263,13 +263,12 @@ export function SectionStripeSetupGuide({ webhookUrl }: { webhookUrl: string }) 
     <div className="mt-8 rounded-2xl bg-card p-6 ring-1 ring-foreground/10">
       <h2 className="text-lg font-medium">Stripe: ein Konto pro Sektion</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Kartenzahlungen einer Sektion gehen auf ihr eigenes Stripe-Konto und von
-        dort auf ihre IBAN. Es gibt kein gemeinsames Konto für mehrere Sektionen.
-        Der Betreiber eröffnet das Konto unter Vereine, bei der jeweiligen Sektion.
+        Kartenzahlungen einer Sektion gehen auf ihr eigenes Stripe-Konto. Legen
+        Sie das Konto im Stripe-Dashboard als normales Konto an und tragen Sie
+        Secret Key und Webhook-Geheimnis beim Betreiber unter der Sektion ein.
       </p>
       <p className="mt-3 text-sm text-muted-foreground">
-        Solange eine Sektion kein Connect-Konto hat, gilt ihr bisheriger Schlüssel.
-        Webhook dafür:{" "}
+        Webhook im Stripe-Konto dieser Sektion:{" "}
         <code className="break-all text-xs text-foreground">{webhookUrl}</code>
       </p>
     </div>

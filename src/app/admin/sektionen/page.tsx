@@ -73,8 +73,8 @@ export default async function SectionsAdminPage() {
         <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           Stripe ist unvollständig bei:{" "}
           {incompleteStripe.map((item) => item.section.name).join(", ")}.
-          Der Betreiber eröffnet unter Vereine ein eigenes Stripe-Konto für jede
-          dieser Sektionen.
+          Der Betreiber trägt unter Vereine den Secret Key des normalen
+          Stripe-Kontos jeder dieser Sektionen ein.
         </p>
       ) : null}
       {incompleteBank.length > 0 ? (

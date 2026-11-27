@@ -123,19 +123,12 @@ export async function anyConnectAccount() {
 export async function sectionCardRail(
   sectionId: string | null | undefined,
 ): Promise<CardRail> {
-  const account = await connectAccountForSection(sectionId);
-  if (account.accountId) {
-    return cardRail({
-      accountId: account.accountId,
-      chargesEnabled: account.chargesEnabled,
-      legacyReady: false,
-    });
-  }
   const { resolveSectionStripeSecretKey } = await import("@/lib/section-payments");
   const key = await resolveSectionStripeSecretKey(sectionId);
+  const account = await connectAccountForSection(sectionId);
   return cardRail({
-    accountId: "",
-    chargesEnabled: false,
+    accountId: account.accountId,
+    chargesEnabled: account.chargesEnabled,
     legacyReady: Boolean(key && isValidStripeSecretKey(key)),
   });
 }
